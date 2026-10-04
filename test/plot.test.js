@@ -37,3 +37,9 @@ test('escape lane labels so they cannot insert SVG markup', () => {
   assert.doesNotMatch(plot.svg, /<script>/);
   assert.match(plot.svg, /&lt;script&gt;&amp;&quot;/);
 });
+test('relative plot and SVG export identify direct normalization and its reference', () => {
+  const plot = buildPlot(rows, 'relative', null, { referenceMethod: 'direct', referenceLane: '1' });
+  assert.match(plot.svg, /Target signal relative to reference/);
+  assert.match(plot.svg, /Direct target normalization · Reference lane: 1/);
+  assert.match(plot.svg, /reference is missing/);
+});

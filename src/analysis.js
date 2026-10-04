@@ -41,6 +41,15 @@ export function normalize(target, control, referenceRatio) {
   return { ratio, relative: ratio !== null && referenceRatio > 0 ? ratio / referenceRatio : null };
 }
 
+export function normalizeWithReference(target, control, referenceTarget, referenceControl, method = 'control') {
+  if (!['control', 'direct'].includes(method)) throw new Error('Invalid reference normalization method');
+  const ratio = normalize(target, control).ratio;
+  const numerator = method === 'direct' ? target : ratio;
+  const baseline = method === 'direct' ? referenceTarget : normalize(referenceTarget, referenceControl).ratio;
+  const relative = Number.isFinite(numerator) && numerator > 0 && Number.isFinite(baseline) && baseline > 0 ? numerator / baseline : null;
+  return { ratio, relative };
+}
+
 export function csvCell(value) {
   let s = value == null ? '' : String(value);
   // Keep user-provided labels from being interpreted as spreadsheet formulas.

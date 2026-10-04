@@ -36,7 +36,9 @@
       <button id="reuse-size" disabled>Use selected size for new bands</button>
       <button id="delete-selected" disabled>Delete selected band/background pair</button>
       <h2>Normalization</h2>
+      <label>Reference normalization<select id="normalization-method"><option value="control">Use loading controls</option><option value="direct">Direct to reference (no loading control)</option></select></label>
       <label>Reference lane<select id="reference"><option value="">Select after measuring</option></select></label>
+      <p id="normalization-hint">Loading-control ratios are normalized to the reference lane.</p>
       <button id="export" disabled>Export CSV</button>
       <button id="annotated" disabled>Export annotated SVG</button>
     </aside>
@@ -55,7 +57,7 @@
         <div id="plot" class="plot-scroll"></div>
       </section>
       <div class="results-heading"><h2>Measurements</h2><span>Corrected signal = integrated signal - background mean × band area</span></div>
-      <div class="table-wrap"><table><thead><tr><th>Lane</th><th>Band</th><th>Area</th><th>Raw signal</th><th>Background mean</th><th>Corrected signal</th><th>Target / control</th><th>Relative to reference</th><th>Flags</th></tr></thead><tbody id="results"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Lane</th><th>Band</th><th>Area</th><th>Raw signal</th><th>Background mean</th><th>Corrected signal</th><th>Target / control</th><th id="relative-heading">Target/control relative to reference</th><th>Flags</th></tr></thead><tbody id="results"></tbody></table></div>
       <p class="footnote">Endpoint pixels are flagged as possibly clipped. This does not establish detector saturation or exposure linearity. Quantitative validation against known images is pending.</p>
     </section>
   </main>

@@ -1,4 +1,4 @@
-import { quantify, normalize, csvCell } from './analysis.js';
+import { quantify, normalize, normalizeWithReference, csvCell } from './analysis.js';
 import { decodeImageFile, toGrayscale, displayRGBA } from './image-input.js';
 import { imagePoint, drawnRect, positionedRect, movedRect, resizedRect, corners, hitRegion, validateLayout, nextLane } from './regions.js';
 import { buildPlot } from './plot.js';
@@ -59,6 +59,8 @@ function paint() {
   if (gesture?.type === 'draw') draw(gesture.rect, pending ? colors.background : colors[$('kind').value], pending ? 'Background' : 'New band', !!pending);
   $('step').textContent = $('tool').value === 'move' ? 'Select, move, or resize a box' : pending ? `Select background for lane ${pending.lane}` : `Draw ${$('kind').value} band for lane ${$('lane').value}`;
 }
+function referenceMethod() { return $('normalization-method').value === 'direct' ? 'direct' : 'control'; }
+function plotOptions() { return { referenceMethod: referenceMethod(), referenceLane: $('reference').value }; }
 function data(preview = false) {
   let current = measurements;
   if (preview && gesture) {
@@ -69,27 +71,30 @@ function data(preview = false) {
   const rows = current.map(m => ({ ...m, ...quantify(pixels, canvas.width, canvas.height, m.band, m.background, $('polarity').value, imageMetadata.maxValue) }));
   const controls = new Map(rows.filter(r => r.kind === 'control').map(r => [r.lane, r.corrected]));
   const ref = rows.find(r => r.kind === 'target' && r.lane === $('reference').value);
-  const referenceRatio = ref ? normalize(ref.corrected, controls.get(ref.lane)).ratio : null;
+  const method = referenceMethod();
+  const baseline = method === 'direct' ? ref?.corrected : ref ? normalize(ref.corrected, controls.get(ref.lane)).ratio : null;
   return rows.map(r => {
-    const n = r.kind === 'target' ? normalize(r.corrected, controls.get(r.lane), referenceRatio) : { ratio: null, relative: null };
+    const n = r.kind === 'target' ? normalizeWithReference(r.corrected, controls.get(r.lane), ref?.corrected, ref ? controls.get(ref.lane) : null, method) : { ratio: null, relative: null };
     const flags = [];
     if (r.clipped) flags.push(`${r.clipped} endpoint pixel(s)`);
     if (r.corrected <= 0) flags.push('Nonpositive signal');
-    if (r.kind === 'target' && !controls.has(r.lane)) flags.push('No loading control');
-    else if (r.kind === 'target' && controls.get(r.lane) <= 0) flags.push('Nonpositive control');
-    if (r.kind === 'target' && $('reference').value && !(referenceRatio > 0)) flags.push('Invalid reference');
+    if (method === 'control' && r.kind === 'target' && !controls.has(r.lane)) flags.push('No loading control');
+    else if (method === 'control' && r.kind === 'target' && controls.get(r.lane) <= 0) flags.push('Nonpositive control');
+    if (r.kind === 'target' && $('reference').value && !(baseline > 0)) flags.push('Invalid reference');
     return { ...r, ...n, flags: flags.join('; ') };
   });
 }
 const format = v => v == null ? '-' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 3 });
 function updatePlot(preview = false, rows = null) {
-  const chart = buildPlot(rows || (pixels ? data(preview) : []), $('plot-mode').value, selected?.id);
+  const chart = buildPlot(rows || (pixels ? data(preview) : []), $('plot-mode').value, selected?.id, plotOptions());
   $('plot').innerHTML = chart.svg;
   $('plot-empty').hidden = !!chart.svg;
   $('plot-status').textContent = preview && gesture ? 'Preview while dragging. Release to apply.' : chart.svg ? `${chart.count} quantified band(s)${chart.missing ? `; ${chart.missing} unavailable` : ''}. Click a bar to select its band.` : 'Complete a band and its background to see the plot.';
   $('export-plot').disabled = !measurements.length;
 }
 function refresh(updateReference = true) {
+  $('normalization-hint').textContent = referenceMethod() === 'direct' ? 'Relative value = corrected target signal / corrected target signal in the reference lane. No loading control is required.' : 'Relative value = target/control ratio / target/control ratio in the reference lane. Loading controls are required.';
+  $('relative-heading').textContent = referenceMethod() === 'direct' ? 'Target / reference target' : 'Target/control relative to reference';
   if (updateReference) {
     const current = $('reference').value;
     $('reference').replaceChildren(new Option('Choose reference lane', ''));
@@ -283,6 +288,7 @@ $('cancel').addEventListener('click', () => { pending = null; gesture = null; se
 $('undo').addEventListener('click', () => { pending = null; gesture = null; selected = null; measurements.pop(); refresh(); });
 $('polarity').addEventListener('change', () => refresh(false));
 $('reference').addEventListener('change', () => refresh(false));
+$('normalization-method').addEventListener('change', () => refresh(false));
 $('plot-mode').addEventListener('change', () => updatePlot());
 function selectPlotBand(event) {
   if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
@@ -300,13 +306,13 @@ function download(content, name, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('export-plot').addEventListener('click', () => {
-  const chart = buildPlot(pixels ? data() : [], $('plot-mode').value);
+  const chart = buildPlot(pixels ? data() : [], $('plot-mode').value, null, plotOptions());
   if (!chart.svg) { message('Measure a target band to export this plot.'); return; }
   download(chart.svg, `densitometry-${$('plot-mode').value || 'corrected'}.svg`, 'image/svg+xml');
 });
 $('export').addEventListener('click', () => {
-  const headers = ['image', 'format', 'bit_depth', 'pixel_max', 'page', 'color_conversion', 'polarity', 'reference_lane', 'lane', 'band_type', 'band_x', 'band_y', 'band_width', 'band_height', 'background_x', 'background_y', 'background_width', 'background_height', 'area_pixels', 'integrated_signal', 'background_mean', 'corrected_signal', 'target_control_ratio', 'relative_to_reference', 'endpoint_pixels', 'flags'];
-  const rows = data().map(r => [filename, imageMetadata.format, imageMetadata.bitDepth, imageMetadata.maxValue, 1, imageMetadata.hasColor ? 'weighted RGB grayscale' : 'none', $('polarity').value, $('reference').value, r.lane, r.kind, r.band.x, r.band.y, r.band.w, r.band.h, r.background.x, r.background.y, r.background.w, r.background.h, r.area, r.sum, r.backgroundMean, r.corrected, r.ratio, r.relative, r.clipped, r.flags]);
+  const headers = ['image', 'format', 'bit_depth', 'pixel_max', 'page', 'color_conversion', 'polarity', 'reference_lane', 'reference_normalization_method', 'lane', 'band_type', 'band_x', 'band_y', 'band_width', 'band_height', 'background_x', 'background_y', 'background_width', 'background_height', 'area_pixels', 'integrated_signal', 'background_mean', 'corrected_signal', 'target_control_ratio', 'relative_to_reference', 'endpoint_pixels', 'flags'];
+  const rows = data().map(r => [filename, imageMetadata.format, imageMetadata.bitDepth, imageMetadata.maxValue, 1, imageMetadata.hasColor ? 'weighted RGB grayscale' : 'none', $('polarity').value, $('reference').value, referenceMethod(), r.lane, r.kind, r.band.x, r.band.y, r.band.w, r.band.h, r.background.x, r.background.y, r.background.w, r.background.h, r.area, r.sum, r.backgroundMean, r.corrected, r.ratio, r.relative, r.clipped, r.flags]);
   download([headers, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n'), 'densitometry.csv', 'text/csv;charset=utf-8');
 });
 const xml = s => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');

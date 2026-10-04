@@ -112,3 +112,21 @@ test('live plot previews dragging, restores on cancel, and updates normalized vi
   assert.match(node('plot').innerHTML, /Lane 1, target: 1/);
   assert.doesNotMatch(node('plot').innerHTML, /data-measurement-id="2"/);
 });
+test('user can select direct reference normalization without measuring controls', () => {
+  const { node, drag } = launch();
+  drag(70, 70, 130, 94); drag(70, 120);
+  drag(225, 70); drag(225, 120);
+  node('reference').value = '1'; node('reference').emit('change');
+  node('plot-mode').value = 'relative'; node('plot-mode').emit('change');
+  assert.match(node('plot').innerHTML, /target: unavailable/);
+  node('normalization-method').value = 'direct'; node('normalization-method').emit('change');
+  assert.equal(node('results').children[0].children[7].textContent, '1');
+  assert.equal(node('results').children[1].children[7].textContent, '0.733');
+  assert.equal(node('results').children[0].children[8].textContent, '-');
+  assert.match(node('plot').innerHTML, /Direct target normalization/);
+  assert.match(node('plot').innerHTML, /Lane 2, target: 0.7333333333333333/);
+  node('normalization-method').value = 'control'; node('normalization-method').emit('change');
+  assert.equal(node('reference').value, '1');
+  assert.equal(node('results').children[0].children[7].textContent, '-');
+  assert.match(node('plot').innerHTML, /Loading-control normalization/);
+});

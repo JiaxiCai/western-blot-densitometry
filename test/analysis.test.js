@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { quantify, measure, normalize, csvCell } from '../src/analysis.js';
+import { quantify, measure, normalize, normalizeWithReference, csvCell } from '../src/analysis.js';
 
 test('dark band subtraction uses background mean scaled by band area', () => {
   const pixels = Uint8Array.from([50, 50, 200, 200, 50, 50, 200, 200]);
@@ -30,4 +30,17 @@ test('escape CSV labels and formula-like text', () => {
   assert.equal(csvCell('a"b'), '"a""b"');
   assert.equal(csvCell('=1+1'), '"\'=1+1"');
   assert.equal(csvCell(-10), '"-10"');
+});
+test('direct reference normalization works without loading controls', () => {
+  assert.deepEqual(normalizeWithReference(200, undefined, 100, undefined, 'direct'), { ratio: null, relative: 2 });
+  assert.deepEqual(normalizeWithReference(100, undefined, 100, undefined, 'direct'), { ratio: null, relative: 1 });
+});
+test('switching reference methods uses the appropriate numerator and denominator', () => {
+  assert.deepEqual(normalizeWithReference(200, 100, 100, 50, 'control'), { ratio: 2, relative: 1 });
+  assert.deepEqual(normalizeWithReference(200, 100, 100, 50, 'direct'), { ratio: 2, relative: 2 });
+});
+test('reference normalization rejects missing or nonpositive required signals', () => {
+  for (const reference of [undefined, 0, -10]) assert.equal(normalizeWithReference(200, undefined, reference, undefined, 'direct').relative, null);
+  assert.equal(normalizeWithReference(-10, undefined, 100, undefined, 'direct').relative, null);
+  assert.equal(normalizeWithReference(200, undefined, 100, 50, 'control').relative, null);
 });

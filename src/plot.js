@@ -16,9 +16,10 @@ function tickStep(range) {
   return (factor <= 1 ? 1 : factor <= 2 ? 2 : factor <= 5 ? 5 : 10) * base;
 }
 
-export function buildPlot(rows, mode = 'corrected', selectedId = null) {
+export function buildPlot(rows, mode = 'corrected', selectedId = null, options = {}) {
   mode = modes[mode] ? mode : 'corrected';
-  const config = modes[mode];
+  const config = { ...modes[mode] };
+  if (mode === 'relative' && options.referenceMethod) config.title = options.referenceMethod === 'direct' ? 'Target signal relative to reference' : 'Target/control relative to reference';
   const plotted = mode === 'corrected' ? rows : rows.filter(r => r.kind === 'target');
   const available = plotted.filter(r => Number.isFinite(r[config.field]));
   if (!plotted.length) return { svg: '', count: 0, missing: 0, title: config.title };
@@ -36,6 +37,7 @@ export function buildPlot(rows, mode = 'corrected', selectedId = null) {
   const baseline = y(0), laneWidth = (right - left) / lanes.length;
   const elements = [];
   elements.push(`<text x="${left}" y="28" font-size="18" font-weight="bold">${config.title}</text>`);
+  if (mode === 'relative' && options.referenceMethod) elements.push(`<text x="${left}" y="52">${options.referenceMethod === 'direct' ? 'Direct target normalization' : 'Loading-control normalization'} · Reference lane: ${xml(options.referenceLane || 'not selected')}</text>`);
   if (mode === 'corrected') elements.push(`<rect x="${right - 174}" y="41" width="12" height="12" fill="${colors.target}"/><text x="${right - 156}" y="52">Target</text><rect x="${right - 90}" y="41" width="12" height="12" fill="${colors.control}"/><text x="${right - 72}" y="52">Control</text>`);
   for (let tick = low; tick <= high + step * 0.001; tick += step) {
     const clean = Math.abs(tick) < step * 1e-8 ? 0 : tick;
@@ -63,7 +65,7 @@ export function buildPlot(rows, mode = 'corrected', selectedId = null) {
     }
   });
   elements.push(`<text x="${(left + right) / 2}" y="${bottom + 55}" text-anchor="middle">Lane</text>`);
-  if (plotted.length !== available.length) elements.push(`<text x="${left}" y="385" fill="#667c90">NA: required control or reference is missing, or corrected signal is nonpositive.</text>`);
+  if (plotted.length !== available.length) elements.push(`<text x="${left}" y="385" fill="#667c90">${mode === 'relative' && options.referenceMethod === 'direct' ? 'NA: reference is missing or corrected target/reference signal is nonpositive.' : 'NA: required control or reference is missing, or corrected signal is nonpositive.'}</text>`);
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.title}" font-family="Arial, sans-serif" font-size="14" fill="#172d40"><rect width="100%" height="100%" fill="white"/>${elements.join('')}</svg>`,
     count: available.length, missing: plotted.length - available.length, title: config.title

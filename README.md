@@ -35,13 +35,13 @@ Rebuild and commit `dist/app.js` after source changes so downloaded copies remai
 5. Uncheck the size lock to draw each rectangle independently. **Draw a new box size** overrides the lock for the next rectangle. Target and control band sizes are remembered separately. Exact pixel dimensions remain available under the optional dimensions panel.
 6. Click a box to select it; drag inside it to move, or drag one of its corner handles to resize. Arrow keys nudge a selected box by one image pixel, or ten with Shift. **Move or resize existing boxes** prevents drawing new boxes while editing. A results row also selects its band.
 7. Change a selected pair's lane label, reuse a selected box's dimensions, or delete a selected band/background pair. Background boxes must not overlap any band; invalid edits are rejected and restored.
-8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
+8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane and reference-normalization method, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
 
 ## Live quantification plot
 
 The plot below the blot updates when a band/background pair is completed and when a box is moved, resized, nudged, relabeled or deleted. During dragging, it previews a valid candidate position; releasing applies the edit, while cancellation restores the saved values. Incomplete bands require a background box before quantification.
 
-Choose background-corrected signal (target and control bars), target/loading-control ratio (target bars only), or values relative to the selected reference lane. Negative corrected signals remain visible. Normalization that lacks a valid control or reference is labeled NA, not plotted as zero. Bars represent individual measurements; there are no replicate summaries or error bars. Hover for values and flags; click a bar to select its band.
+Choose background-corrected signal (target and control bars), target/loading-control ratio (target bars only), or values relative to the selected reference lane. Negative corrected signals remain visible. Normalization that lacks the inputs required by the selected method is labeled NA, not plotted as zero. Bars represent individual measurements; there are no replicate summaries or error bars. Hover for values and flags; click a bar to select its band.
 
 **Export plot SVG** downloads the committed measurements in the selected view with editable Arial text. Long lane labels are shortened on the axis; their complete labels remain in tooltips and exported SVG titles. Larger plots scroll horizontally.
 
@@ -57,9 +57,14 @@ For each analysis pixel, dark signal is `maximum value - grayscale value`; brigh
 
 `normalized ratio = corrected target signal / corrected loading-control signal`
 
-`relative value = normalized ratio / reference-lane normalized ratio`
+Reference normalization has two user-selectable methods:
 
-Negative corrected signals are retained. Normalization is unavailable for nonpositive target or control signals. Zero (dark polarity) or maximum-value (bright polarity) pixels are flagged as possibly clipped; image endpoints alone cannot establish detector saturation. PNG and JPEG values come from the browser decoder and can reflect color management. JPEG compression is lossy; prefer original TIFFs for quantitative analysis. TIFF pixel values are decoded separately from the 8-bit preview. The 16-bit preview uses a min-max contrast stretch for visibility, which does not change measurement values. Exported annotated SVGs embed that display preview, not the full-depth source TIFF. Match exposure settings and verify the linear response range independently.
+- **Use loading controls** (default): `relative value = (corrected target / corrected control) / (reference target / reference control)`.
+- **Direct to reference (no loading control)**: `relative value = corrected target / corrected reference target`. Loading-control bands are optional and do not enter this calculation.
+
+Choose the method under **Normalization → Reference normalization**, select a reference lane, then choose **Relative to reference lane** in the plot. The reference lane becomes 1. The table heading, plot title and exported SVG identify the selected method; CSV exports include `reference_normalization_method` (`control` or `direct`). The target/control ratio column still requires a loading control regardless of the reference method.
+
+Negative corrected signals are retained. Reference normalization is unavailable for nonpositive target/reference signals; the loading-control method also requires positive controls. Zero (dark polarity) or maximum-value (bright polarity) pixels are flagged as possibly clipped; image endpoints alone cannot establish detector saturation. PNG and JPEG values come from the browser decoder and can reflect color management. JPEG compression is lossy; prefer original TIFFs for quantitative analysis. TIFF pixel values are decoded separately from the 8-bit preview. The 16-bit preview uses a min-max contrast stretch for visibility, which does not change measurement values. Exported annotated SVGs embed that display preview, not the full-depth source TIFF. Match exposure settings and verify the linear response range independently.
 
 ## Initial development plan
 
@@ -74,6 +79,7 @@ Negative corrected signals are retained. Normalization is unavailable for nonpos
 - [ ] Zoom and session save/load
 - [ ] Lane intensity profiles and assisted detection after manual workflow validation
 - [x] Live bar plots, normalized views and editable SVG plot export
+- [x] Direct target-to-reference normalization without a loading control
 - [ ] Total-protein normalization and replicate summaries
 
 ## Format support and limits
