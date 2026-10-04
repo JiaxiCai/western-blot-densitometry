@@ -29,10 +29,15 @@ Rebuild and commit `dist/app.js` after source changes so downloaded copies remai
 ## Current workflow
 
 1. Open a TIFF (.tif/.tiff), JPEG (.jpg/.jpeg), or 8-bit PNG, or load the synthetic example. The status beside the input reports loading errors, bit depth, and conversion notes.
-2. Choose dark or bright signal polarity. Set lane label, band type, and box dimensions in original-image pixels.
-3. Click the center of a band, then a nearby blank area to place its background box. Background must not include bands; the operator is responsible for selecting an appropriate area.
-4. Measure target and loading-control bands using the same lane label. Use consistent target box sizes across lanes, and consistent control box sizes across lanes.
-5. Choose a reference lane. Export full-precision measurements as CSV and regions as an annotated SVG with editable Arial text.
+2. Choose dark or bright signal polarity, the next lane label, and band type. Color images are automatically converted to weighted grayscale for both display and measurement.
+3. Click and drag around the first band to define its box dimensions. Blue boxes are target bands; purple boxes are loading controls.
+4. Select nearby blank background for that band (dashed orange). With **Keep subsequent boxes the same size** checked, click or drag to position a box of the remembered size. After each completed pair, the lane label advances automatically so you can continue adding bands.
+5. Uncheck the size lock to draw each rectangle independently. **Draw a new box size** overrides the lock for the next rectangle. Target and control band sizes are remembered separately. Exact pixel dimensions remain available under the optional dimensions panel.
+6. Click a box to select it; drag inside it to move, or drag one of its corner handles to resize. Arrow keys nudge a selected box by one image pixel, or ten with Shift. **Move or resize existing boxes** prevents drawing new boxes while editing. A results row also selects its band.
+7. Change a selected pair's lane label, reuse a selected box's dimensions, or delete a selected band/background pair. Background boxes must not overlap any band; invalid edits are rejected and restored.
+8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
+
+Keep target box sizes consistent across lanes, and control sizes consistent across lanes, unless you have a justified reason to change them. Resizing a box recalculates its measurement but does not automatically alter the remembered template; use **Use selected size for new bands** to adopt it.
 
 Images and measurements remain in browser memory. The app has no upload endpoint, analytics, or network dependencies at runtime. Refreshing or closing the page loses the current session. Do not commit experimental images or results to this repository; common data extensions are ignored.
 
@@ -57,7 +62,8 @@ Negative corrected signals are retained. Normalization is unavailable for nonpos
 - [x] Native unsigned 8-bit and 16-bit TIFF decoding and pixel-depth preservation
 - [x] JPEG input and weighted grayscale conversion of RGB input
 - [x] Bundled app that starts without JavaScript module imports
-- [ ] Editable and movable regions, zoom, and session save/load
+- [x] Drawn sizes, optional size lock, draggable/resizable boxes, automatic lane advance
+- [ ] Zoom and session save/load
 - [ ] Lane intensity profiles and assisted detection after manual workflow validation
 - [ ] Total-protein normalization and replicate summaries
 
@@ -72,7 +78,7 @@ Negative corrected signals are retained. Normalization is unavailable for nonpos
 
 ## Verification
 
-Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. A simulated-DOM smoke test verifies that the committed bundle starts and enables the input tools without module imports. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
+Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging and deletion. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
 
 ## Project structure
 
@@ -80,6 +86,7 @@ Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte
 - `src/app.js`: input, region selection, tables, and exports
 - `src/analysis.js`: numerical calculations
 - `src/image-input.js`: format detection, native TIFF decoding, grayscale conversion and previews
+- `src/regions.js`: image/display geometry, region editing and lane progression
 - `dist/app.js`: committed, ready-to-run browser bundle
 - `test/`: numerical, TIFF fixture and bundle startup checks
 

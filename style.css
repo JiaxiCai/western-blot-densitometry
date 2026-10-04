@@ -29,4 +29,12 @@ table { border-collapse: collapse; width: 100%; font-size: 14px; white-space: no
 th, td { text-align: right; padding: 13px; border-bottom: 1px solid #dbe3eb; }
 th { background: #e4edf5; } th:first-child, td:first-child, th:nth-child(2), td:nth-child(2), th:last-child, td:last-child { text-align: left; }
 .footnote { color: #506579; }
+.checkbox-label { display: flex; align-items: center; gap: 9px; line-height: 1.4; }
+.checkbox-label input { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+details { margin: 12px 0; } summary { cursor: pointer; font-size: 14px; padding: 8px 0; }
+.grayscale-note { color: #176f8c; }
+.band-key { color: #007caa; } .background-key { color: #a95100; }
+#size-hint, #selected-info { padding: 10px; background: #edf5fa; }
+tbody tr { cursor: pointer; } tbody tr.selected { background: #e2f2fa; }
+canvas:focus-visible { outline: 3px solid #43a5cf; outline-offset: 4px; }
 @media (max-width: 900px) { header { align-items: start; flex-direction: column; } main { grid-template-columns: 1fr; } aside { border-right: 0; } .workspace-heading, .results-heading { flex-direction: column; } }

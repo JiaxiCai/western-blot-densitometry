@@ -13,15 +13,28 @@
       <button id="demo" disabled>Load example</button>
       <p id="load-status" role="status" aria-live="polite">Starting image tools...</p>
       <p id="image-info">Images stay in this browser.</p>
+      <p class="grayscale-note">Images are automatically displayed and measured in grayscale.</p>
       <label>Signal polarity<select id="polarity"><option value="dark">Dark bands on light background</option><option value="bright">Bright bands on dark background</option></select></label>
       <h2>Regions</h2>
-      <label>Lane label<input id="lane" value="1" maxlength="80"></label>
+      <label>Tool<select id="tool"><option value="draw">Draw bands and background</option><option value="move">Move or resize existing boxes</option></select></label>
+      <label>Next lane label<input id="lane" value="1" maxlength="80"></label>
       <label>Band type<select id="kind"><option value="target">Target</option><option value="control">Loading control</option></select></label>
-      <label>Box width (pixels)<input id="box-w" type="number" min="1" value="60"></label>
-      <label>Box height (pixels)<input id="box-h" type="number" min="1" value="24"></label>
-      <p>Click the image to place a fixed-size band box. Then click a nearby blank area to place its background box. Repeat for the loading control using the same lane label.</p>
+      <label class="checkbox-label"><input id="lock-size" type="checkbox" checked> Keep subsequent boxes the same size</label>
+      <p id="size-hint">Drag the first box to define its size.</p>
+      <button id="draw-new-size">Draw a new box size</button>
+      <details><summary>Enter exact dimensions</summary>
+        <label>Box width (pixels)<input id="box-w" type="number" min="2" value="60"></label>
+        <label>Box height (pixels)<input id="box-h" type="number" min="2" value="24"></label>
+      </details>
+      <p class="region-key"><span class="band-key">Solid blue/purple: band</span><br><span class="background-key">Dashed orange: paired background</span></p>
+      <p>Draw around a band, then select nearby blank background. The next lane label advances automatically. Drag inside any box to move it, or drag a selected corner to resize.</p>
       <button id="cancel">Cancel pending band</button>
       <button id="undo">Remove last measurement</button>
+      <h2>Selected box</h2>
+      <p id="selected-info">Click a box to select it.</p>
+      <label>Selected lane label<input id="selected-lane" maxlength="80" disabled></label>
+      <button id="reuse-size" disabled>Use selected size for new bands</button>
+      <button id="delete-selected" disabled>Delete selected band/background pair</button>
       <h2>Normalization</h2>
       <label>Reference lane<select id="reference"><option value="">Select after measuring</option></select></label>
       <button id="export" disabled>Export CSV</button>
@@ -29,7 +42,7 @@
     </aside>
     <section class="workspace">
       <div class="workspace-heading"><h2>Blot workspace</h2><span id="step">Open an image or load the example</span></div>
-      <div class="image-wrap"><canvas id="blot" aria-label="Blot image. Click to place band and background regions."></canvas><p id="empty">Load a blot to begin measuring</p></div>
+      <div class="image-wrap"><canvas id="blot" tabindex="0" aria-label="Blot image. Drag to draw, move, or resize boxes. Arrow keys move a selected box."></canvas><p id="empty">Load a blot to begin measuring</p></div>
       <p id="message" role="status" aria-live="polite">Open an original TIFF when available. JPEG and PNG inputs are also supported.</p>
       <div class="results-heading"><h2>Measurements</h2><span>Corrected signal = integrated signal - background mean × band area</span></div>
       <div class="table-wrap"><table><thead><tr><th>Lane</th><th>Band</th><th>Area</th><th>Raw signal</th><th>Background mean</th><th>Corrected signal</th><th>Target / control</th><th>Relative to reference</th><th>Flags</th></tr></thead><tbody id="results"></tbody></table></div>
@@ -37,7 +50,7 @@
     </section>
   </main>
   <script>
-    // This runs even when a browser refuses to load the module from file://.
+    // Report missing or failed app bundles before the image tools initialize.
     const startupStatus = document.getElementById('load-status');
     function reportStartupFailure(text) {
       startupStatus.textContent = text;
