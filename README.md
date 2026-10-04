@@ -37,6 +37,14 @@ Rebuild and commit `dist/app.js` after source changes so downloaded copies remai
 7. Change a selected pair's lane label, reuse a selected box's dimensions, or delete a selected band/background pair. Background boxes must not overlap any band; invalid edits are rejected and restored.
 8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
 
+## Live quantification plot
+
+The plot below the blot updates when a band/background pair is completed and when a box is moved, resized, nudged, relabeled or deleted. During dragging, it previews a valid candidate position; releasing applies the edit, while cancellation restores the saved values. Incomplete bands require a background box before quantification.
+
+Choose background-corrected signal (target and control bars), target/loading-control ratio (target bars only), or values relative to the selected reference lane. Negative corrected signals remain visible. Normalization that lacks a valid control or reference is labeled NA, not plotted as zero. Bars represent individual measurements; there are no replicate summaries or error bars. Hover for values and flags; click a bar to select its band.
+
+**Export plot SVG** downloads the committed measurements in the selected view with editable Arial text. Long lane labels are shortened on the axis; their complete labels remain in tooltips and exported SVG titles. Larger plots scroll horizontally.
+
 Keep target box sizes consistent across lanes, and control sizes consistent across lanes, unless you have a justified reason to change them. Resizing a box recalculates its measurement but does not automatically alter the remembered template; use **Use selected size for new bands** to adopt it.
 
 Images and measurements remain in browser memory. The app has no upload endpoint, analytics, or network dependencies at runtime. Refreshing or closing the page loses the current session. Do not commit experimental images or results to this repository; common data extensions are ignored.
@@ -65,6 +73,7 @@ Negative corrected signals are retained. Normalization is unavailable for nonpos
 - [x] Drawn sizes, optional size lock, draggable/resizable boxes, automatic lane advance
 - [ ] Zoom and session save/load
 - [ ] Lane intensity profiles and assisted detection after manual workflow validation
+- [x] Live bar plots, normalized views and editable SVG plot export
 - [ ] Total-protein normalization and replicate summaries
 
 ## Format support and limits
@@ -78,7 +87,7 @@ Negative corrected signals are retained. Normalization is unavailable for nonpos
 
 ## Verification
 
-Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging and deletion. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
+Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation and normalization views. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
 
 ## Project structure
 
@@ -87,6 +96,7 @@ Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte
 - `src/analysis.js`: numerical calculations
 - `src/image-input.js`: format detection, native TIFF decoding, grayscale conversion and previews
 - `src/regions.js`: image/display geometry, region editing and lane progression
+- `src/plot.js`: live SVG charts and plot export
 - `dist/app.js`: committed, ready-to-run browser bundle
 - `test/`: numerical, TIFF fixture and bundle startup checks
 

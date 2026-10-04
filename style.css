@@ -37,4 +37,14 @@ details { margin: 12px 0; } summary { cursor: pointer; font-size: 14px; padding:
 #size-hint, #selected-info { padding: 10px; background: #edf5fa; }
 tbody tr { cursor: pointer; } tbody tr.selected { background: #e2f2fa; }
 canvas:focus-visible { outline: 3px solid #43a5cf; outline-offset: 4px; }
+.plot-panel { background: white; border: 1px solid #cdd7e3; border-radius: 6px; padding: 18px; margin-top: 22px; }
+.plot-heading { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.plot-heading h2 { flex: 1; margin: 0; }
+.plot-heading label { margin: 0; min-width: 230px; }
+.plot-heading button { width: auto; }
+.plot-scroll { overflow-x: auto; }
+.plot-scroll svg { display: block; max-width: none; }
+.plot-scroll [data-measurement-id] { cursor: pointer; }
+.plot-scroll [data-measurement-id]:focus-visible rect { stroke: #142d46; stroke-width: 4; }
+#plot-status, #plot-empty { color: #506579; }
 @media (max-width: 900px) { header { align-items: start; flex-direction: column; } main { grid-template-columns: 1fr; } aside { border-right: 0; } .workspace-heading, .results-heading { flex-direction: column; } }

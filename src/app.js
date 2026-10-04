@@ -1,6 +1,7 @@
 import { quantify, normalize, csvCell } from './analysis.js';
 import { decodeImageFile, toGrayscale, displayRGBA } from './image-input.js';
 import { imagePoint, drawnRect, positionedRect, movedRect, resizedRect, corners, hitRegion, validateLayout, nextLane } from './regions.js';
+import { buildPlot } from './plot.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('blot'), ctx = canvas.getContext('2d');
@@ -58,8 +59,14 @@ function paint() {
   if (gesture?.type === 'draw') draw(gesture.rect, pending ? colors.background : colors[$('kind').value], pending ? 'Background' : 'New band', !!pending);
   $('step').textContent = $('tool').value === 'move' ? 'Select, move, or resize a box' : pending ? `Select background for lane ${pending.lane}` : `Draw ${$('kind').value} band for lane ${$('lane').value}`;
 }
-function data() {
-  const rows = measurements.map(m => ({ ...m, ...quantify(pixels, canvas.width, canvas.height, m.band, m.background, $('polarity').value, imageMetadata.maxValue) }));
+function data(preview = false) {
+  let current = measurements;
+  if (preview && gesture) {
+    if (gesture.type === 'draw' && pending && gesture.rect.w >= 2 && gesture.rect.h >= 2) current = [...measurements, { ...pending, background: gesture.rect }];
+    else if (gesture.type !== 'draw') current = measurements.map(m => m.id === gesture.id ? { ...m, [gesture.part]: gesture.rect } : m);
+    try { validateLayout(current); } catch { current = measurements; }
+  }
+  const rows = current.map(m => ({ ...m, ...quantify(pixels, canvas.width, canvas.height, m.band, m.background, $('polarity').value, imageMetadata.maxValue) }));
   const controls = new Map(rows.filter(r => r.kind === 'control').map(r => [r.lane, r.corrected]));
   const ref = rows.find(r => r.kind === 'target' && r.lane === $('reference').value);
   const referenceRatio = ref ? normalize(ref.corrected, controls.get(ref.lane)).ratio : null;
@@ -75,6 +82,13 @@ function data() {
   });
 }
 const format = v => v == null ? '-' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 3 });
+function updatePlot(preview = false, rows = null) {
+  const chart = buildPlot(rows || (pixels ? data(preview) : []), $('plot-mode').value, selected?.id);
+  $('plot').innerHTML = chart.svg;
+  $('plot-empty').hidden = !!chart.svg;
+  $('plot-status').textContent = preview && gesture ? 'Preview while dragging. Release to apply.' : chart.svg ? `${chart.count} quantified band(s)${chart.missing ? `; ${chart.missing} unavailable` : ''}. Click a bar to select its band.` : 'Complete a band and its background to see the plot.';
+  $('export-plot').disabled = !measurements.length;
+}
 function refresh(updateReference = true) {
   if (updateReference) {
     const current = $('reference').value;
@@ -83,7 +97,8 @@ function refresh(updateReference = true) {
     if ([...$('reference').options].some(o => o.value === current)) $('reference').value = current;
   }
   $('results').replaceChildren();
-  if (pixels) data().forEach(r => {
+  const rows = pixels ? data() : [];
+  rows.forEach(r => {
     const tr = document.createElement('tr');
     tr.tabIndex = 0; tr.classList.toggle('selected', selected?.id === r.id);
     tr.addEventListener('click', () => { selected = { id: r.id, part: 'band' }; refresh(false); });
@@ -97,6 +112,7 @@ function refresh(updateReference = true) {
   $('cancel').disabled = !pending; $('undo').disabled = !measurements.length;
   $('kind').disabled = !!pending;
   updateEditor();
+  updatePlot(false, rows);
   paint();
 }
 function installImage(decoded, name) {
@@ -195,6 +211,7 @@ canvas.addEventListener('pointermove', event => {
   else if (gesture.type === 'resize') gesture.rect = resizedRect(gesture.original, gesture.corner, point, canvas.width, canvas.height);
   else gesture.rect = movedRect(gesture.original, gesture.start, point, canvas.width, canvas.height);
   paint();
+  updatePlot(true);
 });
 canvas.addEventListener('pointerup', event => {
   if (!gesture || event.pointerId !== gesture.pointerId) return;
@@ -266,11 +283,27 @@ $('cancel').addEventListener('click', () => { pending = null; gesture = null; se
 $('undo').addEventListener('click', () => { pending = null; gesture = null; selected = null; measurements.pop(); refresh(); });
 $('polarity').addEventListener('change', () => refresh(false));
 $('reference').addEventListener('change', () => refresh(false));
+$('plot-mode').addEventListener('change', () => updatePlot());
+function selectPlotBand(event) {
+  if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+  const bar = event.target.closest('[data-measurement-id]');
+  if (!bar) return;
+  const id = Number(bar.getAttribute('data-measurement-id'));
+  if (!measurements.some(m => m.id === id)) return;
+  event.preventDefault(); selected = { id, part: 'band' }; refresh(false);
+}
+$('plot').addEventListener('click', selectPlotBand);
+$('plot').addEventListener('keydown', selectPlotBand);
 function download(content, name, type) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement('a'); a.href = url; a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+$('export-plot').addEventListener('click', () => {
+  const chart = buildPlot(pixels ? data() : [], $('plot-mode').value);
+  if (!chart.svg) { message('Measure a target band to export this plot.'); return; }
+  download(chart.svg, `densitometry-${$('plot-mode').value || 'corrected'}.svg`, 'image/svg+xml');
+});
 $('export').addEventListener('click', () => {
   const headers = ['image', 'format', 'bit_depth', 'pixel_max', 'page', 'color_conversion', 'polarity', 'reference_lane', 'lane', 'band_type', 'band_x', 'band_y', 'band_width', 'band_height', 'background_x', 'background_y', 'background_width', 'background_height', 'area_pixels', 'integrated_signal', 'background_mean', 'corrected_signal', 'target_control_ratio', 'relative_to_reference', 'endpoint_pixels', 'flags'];
   const rows = data().map(r => [filename, imageMetadata.format, imageMetadata.bitDepth, imageMetadata.maxValue, 1, imageMetadata.hasColor ? 'weighted RGB grayscale' : 'none', $('polarity').value, $('reference').value, r.lane, r.kind, r.band.x, r.band.y, r.band.w, r.band.h, r.background.x, r.background.y, r.background.w, r.background.h, r.area, r.sum, r.backgroundMean, r.corrected, r.ratio, r.relative, r.clipped, r.flags]);

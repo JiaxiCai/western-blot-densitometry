@@ -53,7 +53,7 @@ function launch() {
   const pointer = (event, x, y) => canvas.emit(event, { button: 0, pointerId: 1, clientX: 10 + x / 2, clientY: 20 + y / 2 });
   function drag(x1, y1, x2 = x1, y2 = y1) { pointer('pointerdown', x1, y1); pointer('pointermove', x2, y2); pointer('pointerup', x2, y2); }
   node('demo').emit('click');
-  return { node, canvas, drag };
+  return { node, canvas, drag, pointer };
 }
 
 test('draw first size, complete background, then add another locked-size band', () => {
@@ -92,4 +92,23 @@ test('unlocked boxes use independently drawn sizes; selected pair can be deleted
   assert.match(node('selected-info').textContent, /x=226/);
   node('delete-selected').emit('click');
   assert.equal(node('results').children.length, 1);
+});
+test('live plot previews dragging, restores on cancel, and updates normalized views', () => {
+  const { node, drag, pointer, canvas } = launch();
+  drag(70, 70, 130, 94); drag(70, 120);
+  assert.match(node('plot').innerHTML, /Lane 1, target: 216000/);
+  pointer('pointerdown', 100, 82); pointer('pointermove', 110, 82);
+  assert.match(node('plot').innerHTML, /Lane 1, target: 180000/);
+  assert.match(node('plot-status').textContent, /Preview/);
+  canvas.emit('pointercancel');
+  assert.match(node('plot').innerHTML, /Lane 1, target: 216000/);
+  node('plot-mode').value = 'ratio'; node('plot-mode').emit('change');
+  assert.match(node('plot').innerHTML, /target: unavailable/);
+  node('kind').value = 'control'; node('kind').emit('change');
+  drag(70, 210, 130, 234); drag(70, 250);
+  assert.match(node('plot').innerHTML, /target: 2.142857142857143/);
+  node('reference').value = '1'; node('reference').emit('change');
+  node('plot-mode').value = 'relative'; node('plot-mode').emit('change');
+  assert.match(node('plot').innerHTML, /Lane 1, target: 1/);
+  assert.doesNotMatch(node('plot').innerHTML, /data-measurement-id="2"/);
 });

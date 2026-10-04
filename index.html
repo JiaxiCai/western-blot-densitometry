@@ -44,6 +44,16 @@
       <div class="workspace-heading"><h2>Blot workspace</h2><span id="step">Open an image or load the example</span></div>
       <div class="image-wrap"><canvas id="blot" tabindex="0" aria-label="Blot image. Drag to draw, move, or resize boxes. Arrow keys move a selected box."></canvas><p id="empty">Load a blot to begin measuring</p></div>
       <p id="message" role="status" aria-live="polite">Open an original TIFF when available. JPEG and PNG inputs are also supported.</p>
+      <section class="plot-panel" aria-label="Live quantification plot">
+        <div class="plot-heading">
+          <h2>Live quantification</h2>
+          <label>Plot values<select id="plot-mode"><option value="corrected">Background-corrected signals</option><option value="ratio">Target / loading control</option><option value="relative">Relative to reference lane</option></select></label>
+          <button id="export-plot" disabled>Export plot SVG</button>
+        </div>
+        <p id="plot-status" role="status" aria-live="polite">Complete a band and its background to see the plot.</p>
+        <p id="plot-empty">Your quantifications will appear here as you measure bands.</p>
+        <div id="plot" class="plot-scroll"></div>
+      </section>
       <div class="results-heading"><h2>Measurements</h2><span>Corrected signal = integrated signal - background mean × band area</span></div>
       <div class="table-wrap"><table><thead><tr><th>Lane</th><th>Band</th><th>Area</th><th>Raw signal</th><th>Background mean</th><th>Corrected signal</th><th>Target / control</th><th>Relative to reference</th><th>Flags</th></tr></thead><tbody id="results"></tbody></table></div>
       <p class="footnote">Endpoint pixels are flagged as possibly clipped. This does not establish detector saturation or exposure linearity. Quantitative validation against known images is pending.</p>
