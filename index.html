@@ -63,6 +63,21 @@
       <label class="checkbox-label"><input id="resize-backgrounds" type="checkbox"> Resize paired background boxes too</label>
       <button id="apply-size-all" disabled>Apply size to all bands in group</button>
       <p>Rows are aligned separately for targets and controls. Spacing uses current left-to-right order and fixed end bands. Numeric resizing keeps each box's top-left corner fixed.</p>
+      <h2>Automatic band detection (experimental)</h2>
+      <label>Minimum local contrast (%)<input id="detect-contrast" type="number" min="0.1" max="100" step="0.5" value="8"></label>
+      <p>Lower contrast finds fainter bands and more noise. Detection follows the selected signal polarity.</p>
+      <details><summary>Detection sizes and row limits</summary>
+        <label>Background neighborhood radius (px)<input id="detect-radius" type="number" min="1" value="60"></label>
+        <label>Minimum band width (px)<input id="detect-min-w" type="number" min="2" value="12"></label>
+        <label>Minimum band height (px)<input id="detect-min-h" type="number" min="2" value="3"></label>
+        <label>Maximum band height (px)<input id="detect-max-h" type="number" min="2" value="60"></label>
+        <label>Box padding (px)<input id="detect-padding" type="number" min="0" value="3"></label>
+        <label>Search from Y (px)<input id="detect-top" type="number" min="0" value="0"></label>
+        <label>Search to Y, exclusive (px)<input id="detect-bottom" type="number" min="1" value="300"></label>
+      </details>
+      <button id="detect-bands" disabled>Detect candidate bands</button>
+      <button id="clear-candidates" disabled>Clear detection preview</button>
+      <p>Green dashed boxes are suggestions. Review below the image, then add bands in lane order. Choose target or control before adding. Existing boxes stay editable.</p>
       <h2>Normalization</h2>
       <label>Reference normalization<select id="normalization-method"><option value="control">Use loading controls</option><option value="direct">Direct to reference (no loading control)</option></select></label>
       <label>Reference lane<select id="reference"><option value="">Select after measuring</option></select></label>
@@ -74,6 +89,11 @@
       <div class="workspace-heading"><h2>Blot workspace</h2><span id="step">Open an image or load the example</span></div>
       <div class="image-wrap"><canvas id="blot" tabindex="0" aria-label="Blot image. Drag to draw, move, or resize boxes. Arrow keys move a selected box."></canvas><p id="empty">Load a blot to begin measuring</p></div>
       <p id="message" role="status" aria-live="polite">Open an original TIFF when available. JPEG and PNG inputs are also supported.</p>
+      <section class="plot-panel" aria-label="Detection review">
+        <h2>Detection review</h2>
+        <p id="detect-status" role="status" aria-live="polite">Detect bands to preview suggestions. Suggestions do not affect measurements.</p>
+        <div class="table-wrap"><table><thead><tr><th>Candidate</th><th>X</th><th>Y</th><th>Width</th><th>Height</th><th>Review</th></tr></thead><tbody id="candidates"></tbody></table></div>
+      </section>
       <section class="plot-panel" aria-label="Live quantification plot">
         <div class="plot-heading">
           <h2>Live quantification</h2>

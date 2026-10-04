@@ -4,6 +4,7 @@ import { imagePoint, drawnRect, positionedRect, movedRect, resizedRect, corners,
 import { buildPlot } from './plot.js';
 import { arrangeBands, editBox, groupKinds, validateRectangles } from './bulk-regions.js';
 import { backgroundForBand, offsetFromPair, describeOffset } from './backgrounds.js';
+import { detectBands } from './detection.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('blot'), ctx = canvas.getContext('2d');
@@ -13,6 +14,7 @@ let selected = null, gesture = null, nextId = 1, forceFree = false;
 let templates = { target: null, control: null };
 let alignment = { target: null, control: null };
 let backgroundOffsets = { target: null, control: null }, lastBackgroundOffset = null;
+let candidates = [];
 const colors = { target: '#007caa', control: '#a251c8', background: '#df7a00' };
 function message(text) { $('message').textContent = text; }
 function loadStatus(text, state = 'info') {
@@ -46,6 +48,8 @@ function rememberBackground(record, adjusted = false) {
   if (adjusted && automaticBackground()) $('background-placement').value = 'remember';
 }
 function updateEditor() {
+  $('detect-bands').disabled = !image || !!pending;
+  $('clear-candidates').disabled = !candidates.length;
   const size = nextSize();
   $('size-hint').textContent = size ? `Next box: ${size.w} × ${size.h} pixels. Click or drag to position it.` : 'Drag from one corner to the opposite corner to define the box size.';
   if (size) { $('box-w').value = size.w; $('box-h').value = size.h; }
@@ -94,6 +98,7 @@ function paint() {
     }
   }
   visible.forEach(m => { draw(m.band, colors[m.kind], `${m.lane} ${m.kind}`, false, m.id, 'band'); draw(m.background, colors.background, `${m.lane} bg`, true, m.id, 'background'); });
+  candidates.forEach((r, i) => draw(r, '#198442', `Candidate ${i + 1}`, true));
   if (visiblePending) draw(visiblePending.band, colors[visiblePending.kind], `${visiblePending.lane} ${visiblePending.kind}`, false, visiblePending.id, 'band');
   if (gesture?.type === 'draw') {
     const rect = !pending && alignment[$('kind').value] !== null ? { ...gesture.rect, y: alignment[$('kind').value] } : gesture.rect;
@@ -173,6 +178,9 @@ function installImage(decoded, name) {
   selected = null; gesture = null; nextId = 1; forceFree = false; templates = { target: null, control: null };
   alignment = { target: null, control: null };
   backgroundOffsets = { target: null, control: null }; lastBackgroundOffset = null;
+  candidates = []; $('candidates').replaceChildren();
+  $('detect-top').value = '0'; $('detect-bottom').value = String(h);
+  $('detect-status').textContent = 'Detect bands to preview suggestions. Suggestions do not affect measurements.';
   $('lane').value = '1'; $('tool').value = 'draw';
   canvas.width = w; canvas.height = h; canvas.style.display = 'block'; $('empty').hidden = true;
   $('box-w').value = Math.min(60, w); $('box-h').value = Math.min(24, h);
@@ -353,6 +361,55 @@ $('align-lock').addEventListener('change', () => {
   else { for (const kind of groupKinds($('batch-kind').value)) alignment[kind] = null; refresh(false); message('Row alignment unlocked. Boxes can move independently.'); }
 });
 $('draw-new-size').addEventListener('click', () => { forceFree = true; $('tool').value = 'draw'; refresh(false); message('Drag a new rectangle to define the next box size.'); });
+function renderCandidates() {
+  $('candidates').replaceChildren();
+  candidates.forEach((rect, index) => {
+    const row = document.createElement('tr'), label = document.createElement('td');
+    label.textContent = index + 1; row.append(label);
+    for (const field of ['x', 'y', 'w', 'h']) {
+      const cell = document.createElement('td'), input = document.createElement('input');
+      input.type = 'number'; input.min = field === 'w' || field === 'h' ? '2' : '0'; input.step = '1'; input.value = rect[field];
+      input.ariaLabel = `Candidate ${index + 1} ${field}`;
+      input.addEventListener('change', () => {
+        const next = { ...rect, [field]: Number(input.value) };
+        try {
+          validateRectangles(measurements, { band: next }, canvas.width, canvas.height);
+          Object.assign(rect, next); paint();
+        } catch (error) { input.value = rect[field]; message(error.message); }
+      });
+      cell.append(input); row.append(cell);
+    }
+    const actions = document.createElement('td'), add = document.createElement('button'), ignore = document.createElement('button');
+    add.textContent = 'Add band'; ignore.textContent = 'Ignore';
+    add.addEventListener('click', () => {
+      if (pending) { message('Complete or cancel the pending background before adding another candidate.'); return; }
+      try {
+        beginDraw({ ...rect });
+        candidates = candidates.filter(r => r !== rect); renderCandidates(); refresh();
+      } catch (error) { message(error.message); }
+    });
+    ignore.addEventListener('click', () => { candidates = candidates.filter(r => r !== rect); renderCandidates(); refresh(false); });
+    actions.append(add); actions.append(ignore); row.append(actions); $('candidates').append(row);
+  });
+  $('detect-status').textContent = `${candidates.length} candidate(s) remaining. Edit coordinates above or add a band, then drag its box on the image. Review every suggestion; detection can miss faint bands or include artifacts.`;
+}
+$('detect-bands').addEventListener('click', () => {
+  if (!pixels || pending) { message('Load an image and complete or cancel the pending band first.'); return; }
+  try {
+    const result = detectBands(pixels, canvas.width, canvas.height, {
+      maxValue: imageMetadata.maxValue, polarity: $('polarity').value,
+      contrast: Number($('detect-contrast').value), radius: Number($('detect-radius').value),
+      minWidth: Number($('detect-min-w').value), minHeight: Number($('detect-min-h').value),
+      maxHeight: Number($('detect-max-h').value), padding: Number($('detect-padding').value),
+      top: Number($('detect-top').value), bottom: Number($('detect-bottom').value),
+      exclude: regions().map(r => r.rect)
+    });
+    candidates = result.candidates; renderCandidates(); refresh(false);
+    if (result.truncated) $('detect-status').textContent += ' Preview limited to 200 candidates; narrow the row range or increase contrast.';
+    message(candidates.length ? 'Green boxes are detection suggestions. Review and add them in your desired lane order; measurements are unchanged until accepted.' : 'No candidates found. Try lower contrast, a larger neighborhood, or different size/row limits.');
+  } catch (error) { message(error.message); }
+});
+$('clear-candidates').addEventListener('click', () => { candidates = []; renderCandidates(); refresh(false); });
 for (const id of ['background-placement', 'background-gap', 'remember-background']) $(id).addEventListener('change', () => refresh(false));
 $('place-background').addEventListener('click', () => {
   const record = selected ? recordFor(selected.id) : null; if (!record) return;
@@ -395,7 +452,7 @@ for (const id of ['box-w', 'box-h']) $(id).addEventListener('change', () => {
 $('lane').addEventListener('input', () => paint());
 $('cancel').addEventListener('click', () => { pending = null; gesture = null; selected = null; forceFree = false; refresh(); });
 $('undo').addEventListener('click', () => { pending = null; gesture = null; selected = null; measurements.pop(); refresh(); });
-$('polarity').addEventListener('change', () => refresh(false));
+$('polarity').addEventListener('change', () => { candidates = []; renderCandidates(); refresh(false); });
 $('reference').addEventListener('change', () => refresh(false));
 $('normalization-method').addEventListener('change', () => refresh(false));
 $('plot-mode').addEventListener('change', () => updatePlot());

@@ -51,3 +51,5 @@ canvas:focus-visible { outline: 3px solid #43a5cf; outline-offset: 4px; }
 #alignment-status { color: #506579; overflow-wrap: anywhere; }
 @media (min-width: 901px) { aside { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 72px); overflow-y: auto; } }
 @media (max-width: 900px) { header { align-items: start; flex-direction: column; } main { grid-template-columns: 1fr; } aside { border-right: 0; } .workspace-heading, .results-heading { flex-direction: column; } }
+#candidates input { min-width: 68px; max-width: 100px; margin: 0; }
+#candidates button { display: inline-block; width: auto; margin: 3px; }

@@ -207,3 +207,42 @@ test('replace selected background and explicitly reuse offset; remembering can b
   drag(400, 140);
   assert.equal(node('results').children.length, 3);
 });
+
+test('detector previews candidates without measuring, edits and accepts with backgrounds', () => {
+  const { node, drag } = launch();
+  for (const [id, value] of Object.entries({ 'detect-contrast': 8, 'detect-radius': 60, 'detect-min-w': 12, 'detect-min-h': 3, 'detect-max-h': 60, 'detect-padding': 0, 'detect-top': 0, 'detect-bottom': 150 })) node(id).value = String(value);
+  node('detect-bands').emit('click');
+  assert.equal(node('candidates').children.length, 4);
+  assert.equal(node('results').children.length, 0);
+  const row = node('candidates').children[0];
+  assert.equal(row.children[1].children[0].value, 70);
+  const xInput = row.children[1].children[0]; xInput.value = '71'; xInput.emit('change');
+  node('background-placement').value = 'above'; node('background-gap').value = '5';
+  row.children[5].children[0].emit('click');
+  assert.equal(node('results').children.length, 1);
+  assert.equal(node('candidates').children.length, 3);
+  assert.match(node('selected-info').textContent, /x=71, y=70.*60 × 24/);
+  drag(100, 82, 102, 82);
+  assert.match(node('selected-info').textContent, /x=73/);
+  node('detect-bands').emit('click');
+  assert.equal(node('candidates').children.length, 3);
+  node('candidates').children[0].children[5].children[1].emit('click');
+  assert.equal(node('candidates').children.length, 2);
+  node('clear-candidates').emit('click');
+  assert.equal(node('candidates').children.length, 0);
+  assert.equal(node('results').children.length, 1);
+});
+test('accepted detection candidate can await manual background and blocks further acceptance', () => {
+  const { node, drag } = launch();
+  for (const [id, value] of Object.entries({ 'detect-contrast': 8, 'detect-radius': 60, 'detect-min-w': 12, 'detect-min-h': 3, 'detect-max-h': 60, 'detect-padding': 0, 'detect-top': 0, 'detect-bottom': 150 })) node(id).value = String(value);
+  node('detect-bands').emit('click');
+  node('candidates').children[0].children[5].children[0].emit('click');
+  assert.equal(node('results').children.length, 0);
+  node('candidates').children[0].children[5].children[0].emit('click');
+  assert.equal(node('candidates').children.length, 3);
+  assert.match(node('message').textContent, /pending background/);
+  drag(70, 120);
+  assert.equal(node('results').children.length, 1);
+  node('polarity').value = 'bright'; node('polarity').emit('change');
+  assert.equal(node('candidates').children.length, 0);
+});

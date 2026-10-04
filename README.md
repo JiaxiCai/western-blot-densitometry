@@ -37,6 +37,18 @@ Rebuild and commit `dist/app.js` after source changes so downloaded copies remai
 7. Change a selected pair's lane label, reuse a selected box's dimensions, or delete a selected band/background pair. Background boxes must not overlap any band; invalid edits are rejected and restored.
 8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane and reference-normalization method, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
 
+## Automatic band detection (experimental)
+
+Load an image, choose the correct dark/bright polarity, and press **Detect candidate bands**. Dashed green boxes are suggestions only: measurements, normalization and exports do not include them until accepted. Under **Detection review**, edit each candidate's X/Y/width/height, click **Add band** in your desired lane order, or **Ignore** it. Choose target or loading-control type before adding. The current lane label, automatic lane advance and row alignment lock apply; acceptance uses the proposed dimensions rather than the drawing size lock. Accepted boxes can be dragged/resized like manually drawn boxes.
+
+Choose automatic background placement before accepting for immediate quantification, or draw each accepted band's background manually. If automatic background placement fails, complete or cancel the pending pair before accepting another candidate. An accepted band's background and its scientific suitability always require review. **Clear detection preview** removes suggestions without affecting accepted measurements. Rerunning detection replaces suggestions and excludes regions overlapping existing band/background boxes. Changing polarity clears suggestions; loading another image resets them.
+
+- **Minimum local contrast (%)** is the required difference between a pixel's signal and its surrounding square-window mean, expressed as a percentage of the image's native maximum value (255 or 65535). Lower it for faint bands; increase it to reduce noise. It is not a confidence score.
+- **Background neighborhood radius** should be larger than a typical band height; larger neighborhoods can help broad bands. **Minimum width/height**, **maximum height**, and **box padding** control component filtering and proposed boxes, in native pixels.
+- **Search from/to Y** limits detection to a horizontal row range, with the bottom coordinate excluded. Use separate searches for targets and controls. Candidates are listed from top to bottom, then left to right; lane labels follow your acceptance order. Padding can extend beyond the searched row but remains within the image.
+
+This first implementation uses local contrast and connected regions, without a trained model or automatic target/control assignment. It can merge touching bands, split irregular bands, miss weak signal, or select text/artifacts. Quantification still uses original grayscale pixels; the detection mask is never measured. Detection currently supports up to 16 million pixels and previews at most 200 suggestions; narrow row limits or adjust filters when the preview is capped. Detection runs locally and can briefly pause the interface on large images. Synthetic fixtures are tested; performance on biological blots is not yet validated.
+
 ## Automatic backgrounds
 
 Choose **Automatically above band** or **Automatically below band** and a nonnegative whole-pixel gap. Every new band gets a matching-size background, and its quantification appears immediately. Backgrounds must be inside the image and cannot overlap any band. If placement fails, the blue/purple pending band remains: draw a background manually, or change the position setting and press **Place background for selected band**. This button also replaces the selected completed band's background after validating the proposed layout.
@@ -114,7 +126,7 @@ Negative corrected signals are retained. Reference normalization is unavailable 
 
 ## Verification
 
-Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation, normalization views, group sizing, alignment locks, equal spacing, automatic background placement, remembered offsets and invalid-placement recovery. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
+Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation, normalization views, group sizing, alignment locks, equal spacing, automatic background placement, remembered offsets and invalid-placement recovery, candidate detection and candidate acceptance. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
 
 ## Project structure
 
@@ -123,6 +135,7 @@ Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte
 - `src/analysis.js`: numerical calculations
 - `src/image-input.js`: format detection, native TIFF decoding, grayscale conversion and previews
 - `src/regions.js`: image/display geometry, region editing and lane progression
+- `src/detection.js`: native-depth local-contrast detection and component filtering
 - `src/backgrounds.js`: same-size background generation and relative offset learning
 - `src/bulk-regions.js`: group alignment, distribution, sizes and transactional validation
 - `src/plot.js`: live SVG charts and plot export
