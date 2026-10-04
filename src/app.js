@@ -1,8 +1,10 @@
 import { bounds, overlap, quantify, normalize, csvCell } from './analysis.js';
+import { decodeImageFile, toGrayscale, displayRGBA } from './image-input.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('blot'), ctx = canvas.getContext('2d');
 let image = null, pixels = null, measurements = [], pending = null, filename = '';
+let imageMetadata = { maxValue: 255, bitDepth: 8, format: 'PNG', pages: 1, hasColor: false };
 const colors = { target: '#007caa', control: '#a251c8', background: '#df7a00' };
 function message(text) { $('message').textContent = text; }
 function loadStatus(text, state = 'info') {
@@ -31,7 +33,7 @@ function paint() {
   $('step').textContent = pending ? 'Click a blank region for background' : 'Click to place a band box';
 }
 function data() {
-  const rows = measurements.map(m => ({ ...m, ...quantify(pixels, canvas.width, canvas.height, m.band, m.background, $('polarity').value) }));
+  const rows = measurements.map(m => ({ ...m, ...quantify(pixels, canvas.width, canvas.height, m.band, m.background, $('polarity').value, imageMetadata.maxValue) }));
   const controls = new Map(rows.filter(r => r.kind === 'control').map(r => [r.lane, r.corrected]));
   const ref = rows.find(r => r.kind === 'target' && r.lane === $('reference').value);
   const referenceRatio = ref ? normalize(ref.corrected, controls.get(ref.lane)).ratio : null;
@@ -66,22 +68,20 @@ function refresh(updateReference = true) {
   $('cancel').disabled = !pending; $('undo').disabled = !measurements.length;
   paint();
 }
-function installImage(source, name) {
-  const w = source.width, h = source.height;
-  const sourceCtx = source.getContext('2d');
-  const raw = sourceCtx.getImageData(0, 0, w, h).data;
-  const gray = new Uint8Array(w * h);
-  for (let i = 0; i < gray.length; i++) {
-    const p = i * 4;
-    if (raw[p] !== raw[p + 1] || raw[p] !== raw[p + 2]) throw new Error('Use a grayscale PNG; color images are not supported in this prototype.');
-    if (raw[p + 3] !== 255) throw new Error('Use an opaque image without transparency.');
-    gray[i] = raw[p];
-  }
-  image = source; pixels = gray; filename = name; measurements = []; pending = null;
+function installImage(decoded, name) {
+  const { width: w, height: h } = decoded;
+  const source = document.createElement('canvas'); source.width = w; source.height = h;
+  source.getContext('2d').putImageData(new ImageData(displayRGBA(decoded.pixels, decoded.maxValue, decoded.bitDepth === 16), w, h), 0, 0);
+  image = source; pixels = decoded.pixels; imageMetadata = decoded; filename = name; measurements = []; pending = null;
   canvas.width = w; canvas.height = h; canvas.style.display = 'block'; $('empty').hidden = true;
   $('box-w').value = Math.min(60, w); $('box-h').value = Math.min(24, h);
-  $('image-info').textContent = `${name} · ${w} × ${h} pixels`;
-  loadStatus(`Loaded ${name} (${w} × ${h} pixels). Click the image to select a band.`);
+  $('image-info').textContent = `${name} · ${w} × ${h} pixels · ${decoded.bitDepth}-bit ${decoded.format}`;
+  const notes = [];
+  if (decoded.format === 'JPEG') notes.push('JPEG is lossy; use the original TIFF for quantitative work.');
+  if (decoded.hasColor) notes.push('Color pixels were converted to weighted grayscale.');
+  if (decoded.pages > 1) notes.push(`Page 1 of ${decoded.pages} is loaded.`);
+  if (decoded.bitDepth === 16) notes.push('Preview contrast is stretched; measurements use original 16-bit values.');
+  loadStatus(`Loaded ${name}. ${notes.join(' ')} Click the image to select a band.`);
   refresh(); message('Place a target band, then select nearby background without other bands.');
 }
 $('file').addEventListener('change', async event => {
@@ -91,17 +91,7 @@ $('file').addEventListener('change', async event => {
     if (image && !confirm('Opening another image will clear the current measurements. Continue?')) return;
     loadStatus(`Loading ${file.name}...`);
     input.disabled = true; $('demo').disabled = true;
-    const buffer = await file.arrayBuffer(), bytes = new Uint8Array(buffer), view = new DataView(buffer);
-    if (bytes.length < 33 || [137, 80, 78, 71, 13, 10, 26, 10].some((v, i) => bytes[i] !== v)) throw new Error('Choose a PNG file.');
-    if (bytes[24] !== 8) throw new Error('Only 8-bit PNG input is supported. Keep your original TIFF for future native-depth analysis.');
-    if (view.getUint32(16) * view.getUint32(20) > 25000000) throw new Error('This prototype supports images up to 25 million pixels.');
-    const url = URL.createObjectURL(file);
-    try {
-      const loaded = new Image(); loaded.src = url;
-      try { await loaded.decode(); } catch { throw new Error('The browser could not decode this PNG. The file may be damaged or unsupported.'); }
-      const source = document.createElement('canvas'); source.width = loaded.naturalWidth; source.height = loaded.naturalHeight;
-      source.getContext('2d').drawImage(loaded, 0, 0); installImage(source, file.name);
-    } finally { URL.revokeObjectURL(url); }
+    installImage(await decodeImageFile(file), file.name);
   } catch (error) { message(error.message); loadStatus(`Image not loaded: ${error.message}`, 'error'); }
   finally { input.value = ''; input.disabled = false; $('demo').disabled = false; }
 });
@@ -113,7 +103,8 @@ $('demo').addEventListener('click', () => {
     c.fillStyle = `rgb(${shade},${shade},${shade})`; c.fillRect(70 + i * 155, 70, 60, 24);
     c.fillStyle = '#a0a0a0'; c.fillRect(70 + i * 155, 210, 60, 24);
   });
-  installImage(source, 'Synthetic example'); message('Example: targets at y=70 and controls at y=210. This is synthetic data, not a biological blot.');
+  const gray = toGrayscale(c.getImageData(0, 0, 720, 300).data, 720, 300, 4, 255);
+  installImage({ ...gray, width: 720, height: 300, maxValue: 255, bitDepth: 8, format: 'Example', pages: 1 }, 'Synthetic example'); message('Example: targets at y=70 and controls at y=210. This is synthetic data, not a biological blot.');
 });
 canvas.addEventListener('click', event => {
   if (!image) return;
@@ -144,8 +135,8 @@ function download(content, name, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 $('export').addEventListener('click', () => {
-  const headers = ['image', 'polarity', 'reference_lane', 'lane', 'band_type', 'band_x', 'band_y', 'band_width', 'band_height', 'background_x', 'background_y', 'background_width', 'background_height', 'area_pixels', 'integrated_signal', 'background_mean', 'corrected_signal', 'target_control_ratio', 'relative_to_reference', 'endpoint_pixels', 'flags'];
-  const rows = data().map(r => [filename, $('polarity').value, $('reference').value, r.lane, r.kind, r.band.x, r.band.y, r.band.w, r.band.h, r.background.x, r.background.y, r.background.w, r.background.h, r.area, r.sum, r.backgroundMean, r.corrected, r.ratio, r.relative, r.clipped, r.flags]);
+  const headers = ['image', 'format', 'bit_depth', 'pixel_max', 'page', 'color_conversion', 'polarity', 'reference_lane', 'lane', 'band_type', 'band_x', 'band_y', 'band_width', 'band_height', 'background_x', 'background_y', 'background_width', 'background_height', 'area_pixels', 'integrated_signal', 'background_mean', 'corrected_signal', 'target_control_ratio', 'relative_to_reference', 'endpoint_pixels', 'flags'];
+  const rows = data().map(r => [filename, imageMetadata.format, imageMetadata.bitDepth, imageMetadata.maxValue, 1, imageMetadata.hasColor ? 'weighted RGB grayscale' : 'none', $('polarity').value, $('reference').value, r.lane, r.kind, r.band.x, r.band.y, r.band.w, r.band.h, r.background.x, r.background.y, r.background.w, r.background.h, r.area, r.sum, r.backgroundMean, r.corrected, r.ratio, r.relative, r.clipped, r.flags]);
   download([headers, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n'), 'densitometry.csv', 'text/csv;charset=utf-8');
 });
 const xml = s => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -162,4 +153,4 @@ refresh();
 window.densitometryReady = true;
 $('file').disabled = false;
 $('demo').disabled = false;
-loadStatus('Ready. Open an 8-bit grayscale PNG or click Load example.');
+loadStatus('Ready. Open a TIFF, JPEG, or PNG, or click Load example.');

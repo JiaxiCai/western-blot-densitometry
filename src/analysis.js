@@ -13,7 +13,7 @@ export function overlap(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-export function measure(pixels, width, height, rect, polarity = 'dark') {
+export function measure(pixels, width, height, rect, polarity = 'dark', maxValue = 255) {
   if (pixels.length !== width * height) throw new Error('Pixel dimensions do not match');
   if (!['dark', 'bright'].includes(polarity)) throw new Error('Invalid polarity');
   const r = bounds(rect, width, height);
@@ -21,17 +21,17 @@ export function measure(pixels, width, height, rect, polarity = 'dark') {
   for (let y = r.y; y < r.y + r.h; y++) {
     for (let x = r.x; x < r.x + r.w; x++) {
       const raw = pixels[y * width + x];
-      sum += polarity === 'dark' ? 255 - raw : raw;
-      if (polarity === 'dark' ? raw === 0 : raw === 255) clipped++;
+      sum += polarity === 'dark' ? maxValue - raw : raw;
+      if (polarity === 'dark' ? raw === 0 : raw === maxValue) clipped++;
     }
   }
   const area = r.w * r.h;
   return { sum, area, mean: sum / area, clipped, rect: r };
 }
 
-export function quantify(pixels, width, height, band, background, polarity) {
-  const signal = measure(pixels, width, height, band, polarity);
-  const bg = measure(pixels, width, height, background, polarity);
+export function quantify(pixels, width, height, band, background, polarity, maxValue = 255) {
+  const signal = measure(pixels, width, height, band, polarity, maxValue);
+  const bg = measure(pixels, width, height, background, polarity, maxValue);
   if (overlap(signal.rect, bg.rect)) throw new Error('Band and background regions overlap');
   return { ...signal, backgroundMean: bg.mean, corrected: signal.sum - bg.mean * signal.area };
 }
