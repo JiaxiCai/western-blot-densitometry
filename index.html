@@ -9,8 +9,9 @@
   <main>
     <aside>
       <h2>Image</h2>
-      <label class="upload">Open PNG<input id="file" type="file" accept="image/png,.png"></label>
-      <button id="demo">Load example</button>
+      <label class="upload">Open PNG<input id="file" type="file" accept="image/png,.png" disabled></label>
+      <button id="demo" disabled>Load example</button>
+      <p id="load-status" role="status" aria-live="polite">Starting image tools...</p>
       <p id="image-info">Images stay in this browser.</p>
       <label>Signal polarity<select id="polarity"><option value="dark">Dark bands on light background</option><option value="bright">Bright bands on dark background</option></select></label>
       <h2>Regions</h2>
@@ -35,6 +36,23 @@
       <p class="footnote">Endpoint pixels are flagged as possibly clipped. This does not establish detector saturation or exposure linearity. Quantitative validation against known images is pending.</p>
     </section>
   </main>
-  <script type="module" src="src/app.js"></script>
+  <script>
+    // This runs even when a browser refuses to load the module from file://.
+    const startupStatus = document.getElementById('load-status');
+    function reportStartupFailure(text) {
+      startupStatus.textContent = text;
+      startupStatus.dataset.state = 'error';
+    }
+    if (location.protocol === 'file:') {
+      reportStartupFailure('Open http://localhost:8000 after starting the Python server. Opening index.html directly prevents the image tools from loading.');
+    }
+    window.addEventListener('error', event => {
+      if (!window.densitometryReady) reportStartupFailure('The image tools could not start. Check that you downloaded the entire repository, start the Python server from that folder, and open http://localhost:8000.');
+    });
+    setTimeout(() => {
+      if (!window.densitometryReady && location.protocol !== 'file:') reportStartupFailure('The image tools have not started. Check that src/app.js and src/analysis.js are included in your download, then reload http://localhost:8000.');
+    }, 5000);
+  </script>
+  <script type="module" src="src/app.js" onerror="reportStartupFailure('The image tools could not load. Start the Python server from the unzipped project folder and open http://localhost:8000.')"></script>
 </body>
 </html>

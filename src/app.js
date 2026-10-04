@@ -5,6 +5,10 @@ const canvas = $('blot'), ctx = canvas.getContext('2d');
 let image = null, pixels = null, measurements = [], pending = null, filename = '';
 const colors = { target: '#007caa', control: '#a251c8', background: '#df7a00' };
 function message(text) { $('message').textContent = text; }
+function loadStatus(text, state = 'info') {
+  $('load-status').textContent = text;
+  $('load-status').dataset.state = state;
+}
 function rectAt(event) {
   const box = canvas.getBoundingClientRect();
   const w = Number($('box-w').value), h = Number($('box-h').value);
@@ -77,24 +81,29 @@ function installImage(source, name) {
   canvas.width = w; canvas.height = h; canvas.style.display = 'block'; $('empty').hidden = true;
   $('box-w').value = Math.min(60, w); $('box-h').value = Math.min(24, h);
   $('image-info').textContent = `${name} · ${w} × ${h} pixels`;
+  loadStatus(`Loaded ${name} (${w} × ${h} pixels). Click the image to select a band.`);
   refresh(); message('Place a target band, then select nearby background without other bands.');
 }
 $('file').addEventListener('change', async event => {
   const file = event.target.files[0]; if (!file) return;
+  const input = event.target;
   try {
     if (image && !confirm('Opening another image will clear the current measurements. Continue?')) return;
+    loadStatus(`Loading ${file.name}...`);
+    input.disabled = true; $('demo').disabled = true;
     const buffer = await file.arrayBuffer(), bytes = new Uint8Array(buffer), view = new DataView(buffer);
     if (bytes.length < 33 || [137, 80, 78, 71, 13, 10, 26, 10].some((v, i) => bytes[i] !== v)) throw new Error('Choose a PNG file.');
     if (bytes[24] !== 8) throw new Error('Only 8-bit PNG input is supported. Keep your original TIFF for future native-depth analysis.');
     if (view.getUint32(16) * view.getUint32(20) > 25000000) throw new Error('This prototype supports images up to 25 million pixels.');
     const url = URL.createObjectURL(file);
     try {
-      const loaded = new Image(); loaded.src = url; await loaded.decode();
+      const loaded = new Image(); loaded.src = url;
+      try { await loaded.decode(); } catch { throw new Error('The browser could not decode this PNG. The file may be damaged or unsupported.'); }
       const source = document.createElement('canvas'); source.width = loaded.naturalWidth; source.height = loaded.naturalHeight;
       source.getContext('2d').drawImage(loaded, 0, 0); installImage(source, file.name);
     } finally { URL.revokeObjectURL(url); }
-  } catch (error) { message(error.message); }
-  finally { event.target.value = ''; }
+  } catch (error) { message(error.message); loadStatus(`Image not loaded: ${error.message}`, 'error'); }
+  finally { input.value = ''; input.disabled = false; $('demo').disabled = false; }
 });
 $('demo').addEventListener('click', () => {
   if (image && !confirm('Loading the example will clear the current measurements. Continue?')) return;
@@ -150,3 +159,7 @@ $('annotated').addEventListener('click', () => {
   download(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image href="${image.toDataURL('image/png')}" width="${canvas.width}" height="${canvas.height}"/><g fill="none" stroke-width="2" font-family="Arial" font-size="14">${regions}</g></svg>`, 'annotated-blot.svg', 'image/svg+xml');
 });
 refresh();
+window.densitometryReady = true;
+$('file').disabled = false;
+$('demo').disabled = false;
+loadStatus('Ready. Open an 8-bit grayscale PNG or click Load example.');

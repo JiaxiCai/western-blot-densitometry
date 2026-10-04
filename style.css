@@ -21,6 +21,8 @@ p { line-height: 1.5; font-size: 14px; }
 .image-wrap { background: #dae3ec; border: 1px solid #bdcad9; border-radius: 6px; padding: 24px; min-height: 280px; display: flex; justify-content: center; align-items: center; }
 canvas { max-width: 100%; width: auto; height: auto; display: none; touch-action: none; cursor: crosshair; background: white; }
 #message { min-height: 24px; color: #345269; }
+#load-status { padding: 10px; background: #edf5fa; border-left: 3px solid #176f8c; overflow-wrap: anywhere; }
+#load-status[data-state="error"] { background: #fff0ed; border-color: #bc3b22; color: #862913; }
 .results-heading { margin-top: 30px; }
 .table-wrap { overflow: auto; background: white; border: 1px solid #cdd7e3; border-radius: 6px; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; white-space: nowrap; }
