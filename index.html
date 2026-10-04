@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Western blot densitometry</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><h1>Western blot densitometry</h1><span>Development prototype · 8-bit PNG</span></header>
+  <main>
+    <aside>
+      <h2>Image</h2>
+      <label class="upload">Open PNG<input id="file" type="file" accept="image/png,.png"></label>
+      <button id="demo">Load example</button>
+      <p id="image-info">Images stay in this browser.</p>
+      <label>Signal polarity<select id="polarity"><option value="dark">Dark bands on light background</option><option value="bright">Bright bands on dark background</option></select></label>
+      <h2>Regions</h2>
+      <label>Lane label<input id="lane" value="1" maxlength="80"></label>
+      <label>Band type<select id="kind"><option value="target">Target</option><option value="control">Loading control</option></select></label>
+      <label>Box width (pixels)<input id="box-w" type="number" min="1" value="60"></label>
+      <label>Box height (pixels)<input id="box-h" type="number" min="1" value="24"></label>
+      <p>Click the image to place a fixed-size band box. Then click a nearby blank area to place its background box. Repeat for the loading control using the same lane label.</p>
+      <button id="cancel">Cancel pending band</button>
+      <button id="undo">Remove last measurement</button>
+      <h2>Normalization</h2>
+      <label>Reference lane<select id="reference"><option value="">Select after measuring</option></select></label>
+      <button id="export" disabled>Export CSV</button>
+      <button id="annotated" disabled>Export annotated SVG</button>
+    </aside>
+    <section class="workspace">
+      <div class="workspace-heading"><h2>Blot workspace</h2><span id="step">Open an image or load the example</span></div>
+      <div class="image-wrap"><canvas id="blot" aria-label="Blot image. Click to place band and background regions."></canvas><p id="empty">Load a blot to begin measuring</p></div>
+      <p id="message" role="status" aria-live="polite">Use an unadjusted 8-bit grayscale PNG for this prototype. TIFF support is planned.</p>
+      <div class="results-heading"><h2>Measurements</h2><span>Corrected signal = integrated signal - background mean × band area</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Lane</th><th>Band</th><th>Area</th><th>Raw signal</th><th>Background mean</th><th>Corrected signal</th><th>Target / control</th><th>Relative to reference</th><th>Flags</th></tr></thead><tbody id="results"></tbody></table></div>
+      <p class="footnote">Endpoint pixels are flagged as possibly clipped. This does not establish detector saturation or exposure linearity. Quantitative validation against known images is pending.</p>
+    </section>
+  </main>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

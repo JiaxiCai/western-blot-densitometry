@@ -1,0 +1,30 @@
+:root { font-family: Arial, sans-serif; color: #172d40; background: #edf2f7; font-size: 16px; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { background: #142d46; color: white; padding: 22px 30px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1 { font-size: 24px; margin: 0; } h2 { font-size: 18px; margin: 0 0 16px; }
+header span, .footnote { font-size: 14px; }
+main { display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: calc(100vh - 72px); }
+aside { background: white; padding: 24px; border-right: 1px solid #cdd7e3; }
+aside h2:not(:first-child) { margin-top: 30px; }
+label { display: block; font-size: 14px; margin-bottom: 14px; }
+input, select, button { font: inherit; width: 100%; border: 1px solid #aab9c9; border-radius: 5px; padding: 9px; background: white; color: #172d40; }
+input, select { margin-top: 6px; }
+button { margin: 4px 0; cursor: pointer; } button:hover { border-color: #176f8c; background: #eff9fc; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #43a5cf; outline-offset: 2px; }
+.upload { background: #146d8c; padding: 12px; border-radius: 5px; color: white; } .upload input { font-size: 14px; }
+p { line-height: 1.5; font-size: 14px; }
+.workspace { padding: 26px; min-width: 0; }
+.workspace-heading, .results-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.workspace-heading span, .results-heading span { font-size: 14px; }
+.image-wrap { background: #dae3ec; border: 1px solid #bdcad9; border-radius: 6px; padding: 24px; min-height: 280px; display: flex; justify-content: center; align-items: center; }
+canvas { max-width: 100%; width: auto; height: auto; display: none; touch-action: none; cursor: crosshair; background: white; }
+#message { min-height: 24px; color: #345269; }
+.results-heading { margin-top: 30px; }
+.table-wrap { overflow: auto; background: white; border: 1px solid #cdd7e3; border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; white-space: nowrap; }
+th, td { text-align: right; padding: 13px; border-bottom: 1px solid #dbe3eb; }
+th { background: #e4edf5; } th:first-child, td:first-child, th:nth-child(2), td:nth-child(2), th:last-child, td:last-child { text-align: left; }
+.footnote { color: #506579; }
+@media (max-width: 900px) { header { align-items: start; flex-direction: column; } main { grid-template-columns: 1fr; } aside { border-right: 0; } .workspace-heading, .results-heading { flex-direction: column; } }
