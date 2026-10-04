@@ -47,4 +47,7 @@ canvas:focus-visible { outline: 3px solid #43a5cf; outline-offset: 4px; }
 .plot-scroll [data-measurement-id] { cursor: pointer; }
 .plot-scroll [data-measurement-id]:focus-visible rect { stroke: #142d46; stroke-width: 4; }
 #plot-status, #plot-empty { color: #506579; }
+.dimension-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#alignment-status { color: #506579; overflow-wrap: anywhere; }
+@media (min-width: 901px) { aside { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 72px); overflow-y: auto; } }
 @media (max-width: 900px) { header { align-items: start; flex-direction: column; } main { grid-template-columns: 1fr; } aside { border-right: 0; } .workspace-heading, .results-heading { flex-direction: column; } }

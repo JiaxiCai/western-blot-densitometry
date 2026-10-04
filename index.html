@@ -33,8 +33,28 @@
       <h2>Selected box</h2>
       <p id="selected-info">Click a box to select it.</p>
       <label>Selected lane label<input id="selected-lane" maxlength="80" disabled></label>
+      <div class="dimension-fields">
+        <label>Width (px)<input id="selected-w" type="number" min="2" disabled></label>
+        <label>Height (px)<input id="selected-h" type="number" min="2" disabled></label>
+      </div>
+      <button id="apply-size-selected" disabled>Apply size to selected box</button>
       <button id="reuse-size" disabled>Use selected size for new bands</button>
       <button id="delete-selected" disabled>Delete selected band/background pair</button>
+      <h2>Align and size band groups</h2>
+      <label>Apply to<select id="batch-kind"><option value="target">Target bands</option><option value="control">Loading-control bands</option><option value="all">Both band types (separate rows)</option></select></label>
+      <button id="align-bands" disabled>Align top edges to selected band</button>
+      <label>Top-edge Y (pixels)<input id="align-y" type="number" min="0" value="0"></label>
+      <button id="align-y-apply" disabled>Align at this Y</button>
+      <label class="checkbox-label"><input id="align-lock" type="checkbox" disabled> Keep band top edges aligned</label>
+      <p id="alignment-status">Alignment unlocked.</p>
+      <button id="distribute-bands" disabled>Distribute centers evenly</button>
+      <div class="dimension-fields">
+        <label>Group width (px)<input id="batch-w" type="number" min="2" value="60"></label>
+        <label>Group height (px)<input id="batch-h" type="number" min="2" value="24"></label>
+      </div>
+      <label class="checkbox-label"><input id="resize-backgrounds" type="checkbox"> Resize paired background boxes too</label>
+      <button id="apply-size-all" disabled>Apply size to all bands in group</button>
+      <p>Rows are aligned separately for targets and controls. Spacing uses current left-to-right order and fixed end bands. Numeric resizing keeps each box's top-left corner fixed.</p>
       <h2>Normalization</h2>
       <label>Reference normalization<select id="normalization-method"><option value="control">Use loading controls</option><option value="direct">Direct to reference (no loading control)</option></select></label>
       <label>Reference lane<select id="reference"><option value="">Select after measuring</option></select></label>

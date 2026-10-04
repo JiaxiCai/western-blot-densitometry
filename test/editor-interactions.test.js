@@ -130,3 +130,28 @@ test('user can select direct reference normalization without measuring controls'
   assert.equal(node('results').children[0].children[7].textContent, '-');
   assert.match(node('plot').innerHTML, /Loading-control normalization/);
 });
+test('numeric sizes, row alignment, equal spacing and persistent alignment work in the app', () => {
+  const { node, drag } = launch();
+  drag(70, 70, 130, 94); drag(70, 140);
+  drag(225, 80); drag(225, 140);
+  drag(400, 60); drag(400, 140);
+  node('batch-kind').value = 'target';
+  node('results').children[0].emit('click');
+  node('align-lock').checked = true; node('align-lock').emit('change');
+  node('results').children[1].emit('click');
+  assert.match(node('selected-info').textContent, /y=70/);
+  node('batch-w').value = '50'; node('batch-h').value = '20'; node('apply-size-all').emit('click');
+  assert.ok(node('results').children.every(tr => tr.children[2].textContent === 1000));
+  node('distribute-bands').emit('click');
+  assert.match(node('selected-info').textContent, /x=235, y=70/);
+  drag(260, 80, 260, 90);
+  node('results').children[0].emit('click');
+  assert.match(node('selected-info').textContent, /y=80/);
+  node('selected-w').value = '40'; node('selected-h').value = '18'; node('apply-size-selected').emit('click');
+  assert.match(node('selected-info').textContent, /40 × 18/);
+  assert.equal(node('results').children[0].children[2].textContent, 720);
+  // The first box drawn in a locked row snaps to that row, independent of draw Y.
+  drag(560, 40); drag(560, 140);
+  node('results').children[3].emit('click');
+  assert.match(node('selected-info').textContent, /y=80/);
+});

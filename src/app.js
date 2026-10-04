@@ -2,6 +2,7 @@ import { quantify, normalize, normalizeWithReference, csvCell } from './analysis
 import { decodeImageFile, toGrayscale, displayRGBA } from './image-input.js';
 import { imagePoint, drawnRect, positionedRect, movedRect, resizedRect, corners, hitRegion, validateLayout, nextLane } from './regions.js';
 import { buildPlot } from './plot.js';
+import { arrangeBands, editBox, groupKinds, validateRectangles } from './bulk-regions.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('blot'), ctx = canvas.getContext('2d');
@@ -9,6 +10,7 @@ let image = null, pixels = null, measurements = [], pending = null, filename = '
 let imageMetadata = { maxValue: 255, bitDepth: 8, format: 'PNG', pages: 1, hasColor: false };
 let selected = null, gesture = null, nextId = 1, forceFree = false;
 let templates = { target: null, control: null };
+let alignment = { target: null, control: null };
 const colors = { target: '#007caa', control: '#a251c8', background: '#df7a00' };
 function message(text) { $('message').textContent = text; }
 function loadStatus(text, state = 'info') {
@@ -38,10 +40,29 @@ function updateEditor() {
   $('selected-info').textContent = rect ? `Lane ${record.lane} · ${selected.part === 'band' ? record.kind : 'background'} · x=${rect.x}, y=${rect.y}, ${rect.w} × ${rect.h} pixels` : 'Click a box to select it. Drag inside to move; drag a corner to resize.';
   $('selected-lane').disabled = !record; $('selected-lane').value = record?.lane || '';
   $('delete-selected').disabled = !record; $('reuse-size').disabled = !rect;
+  $('selected-w').disabled = !rect; $('selected-h').disabled = !rect; $('apply-size-selected').disabled = !rect;
+  if (rect) {
+    $('selected-w').value = rect.w; $('selected-h').value = rect.h;
+    $('batch-w').value = rect.w; $('batch-h').value = rect.h;
+  }
+  const scope = $('batch-kind').value;
+  const kinds = groupKinds(scope);
+  $('align-lock').checked = kinds.every(kind => alignment[kind] !== null);
+  $('align-lock').disabled = !image || !!pending;
+  for (const id of ['align-bands', 'align-y-apply', 'distribute-bands', 'apply-size-all']) $(id).disabled = !image || !!pending;
+  if (record?.band) $('align-y').value = record.band.y;
+  $('alignment-status').textContent = kinds.map(kind => alignment[kind] === null ? `${kind}: alignment unlocked` : `${kind}: locked to Y=${alignment[kind]}`).join('; ');
 }
 function paint() {
   if (!image) return;
   ctx.drawImage(image, 0, 0);
+  let visible = measurements, visiblePending = pending;
+  if (gesture && gesture.type !== 'draw') {
+    try {
+      const preview = editBox(measurements, pending, gesture.id, gesture.part, gesture.rect, alignment, canvas.width, canvas.height);
+      visible = preview.measurements; visiblePending = preview.pending;
+    } catch { /* Invalid positions are rejected when released. */ }
+  }
   function draw(r, color, label, dashed, id, part) {
     if (gesture && gesture.type !== 'draw' && gesture.id === id && gesture.part === part) r = gesture.rect;
     ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash(dashed ? [5, 3] : []);
@@ -54,9 +75,12 @@ function paint() {
       for (const p of Object.values(corners(r))) { ctx.fillRect(p.x - handle / 2, p.y - handle / 2, handle, handle); ctx.strokeRect(p.x - handle / 2, p.y - handle / 2, handle, handle); }
     }
   }
-  measurements.forEach(m => { draw(m.band, colors[m.kind], `${m.lane} ${m.kind}`, false, m.id, 'band'); draw(m.background, colors.background, `${m.lane} bg`, true, m.id, 'background'); });
-  if (pending) draw(pending.band, colors[pending.kind], `${pending.lane} ${pending.kind}`, false, pending.id, 'band');
-  if (gesture?.type === 'draw') draw(gesture.rect, pending ? colors.background : colors[$('kind').value], pending ? 'Background' : 'New band', !!pending);
+  visible.forEach(m => { draw(m.band, colors[m.kind], `${m.lane} ${m.kind}`, false, m.id, 'band'); draw(m.background, colors.background, `${m.lane} bg`, true, m.id, 'background'); });
+  if (visiblePending) draw(visiblePending.band, colors[visiblePending.kind], `${visiblePending.lane} ${visiblePending.kind}`, false, visiblePending.id, 'band');
+  if (gesture?.type === 'draw') {
+    const rect = !pending && alignment[$('kind').value] !== null ? { ...gesture.rect, y: alignment[$('kind').value] } : gesture.rect;
+    draw(rect, pending ? colors.background : colors[$('kind').value], pending ? 'Background' : 'New band', !!pending);
+  }
   $('step').textContent = $('tool').value === 'move' ? 'Select, move, or resize a box' : pending ? `Select background for lane ${pending.lane}` : `Draw ${$('kind').value} band for lane ${$('lane').value}`;
 }
 function referenceMethod() { return $('normalization-method').value === 'direct' ? 'direct' : 'control'; }
@@ -65,7 +89,10 @@ function data(preview = false) {
   let current = measurements;
   if (preview && gesture) {
     if (gesture.type === 'draw' && pending && gesture.rect.w >= 2 && gesture.rect.h >= 2) current = [...measurements, { ...pending, background: gesture.rect }];
-    else if (gesture.type !== 'draw') current = measurements.map(m => m.id === gesture.id ? { ...m, [gesture.part]: gesture.rect } : m);
+    else if (gesture.type !== 'draw') {
+      try { current = editBox(measurements, pending, gesture.id, gesture.part, gesture.rect, alignment, canvas.width, canvas.height).measurements; }
+      catch { current = measurements; }
+    }
     try { validateLayout(current); } catch { current = measurements; }
   }
   const rows = current.map(m => ({ ...m, ...quantify(pixels, canvas.width, canvas.height, m.band, m.background, $('polarity').value, imageMetadata.maxValue) }));
@@ -126,6 +153,7 @@ function installImage(decoded, name) {
   source.getContext('2d').putImageData(new ImageData(displayRGBA(decoded.pixels, decoded.maxValue, decoded.bitDepth === 16), w, h), 0, 0);
   image = source; pixels = decoded.pixels; imageMetadata = decoded; filename = name; measurements = []; pending = null;
   selected = null; gesture = null; nextId = 1; forceFree = false; templates = { target: null, control: null };
+  alignment = { target: null, control: null };
   $('lane').value = '1'; $('tool').value = 'draw';
   canvas.width = w; canvas.height = h; canvas.style.display = 'block'; $('empty').hidden = true;
   $('box-w').value = Math.min(60, w); $('box-h').value = Math.min(24, h);
@@ -165,8 +193,9 @@ function beginDraw(rect) {
     let lane = $('lane').value.trim(), kind = $('kind').value;
     if (!lane) throw new Error('Enter a lane label.');
     if (measurements.some(m => m.lane === lane && m.kind === kind)) lane = nextLane(lane, kind, measurements);
+    if (alignment[kind] !== null) rect = { ...rect, y: alignment[kind] };
     const candidate = { id: nextId++, lane, kind, band: rect };
-    validateLayout(measurements, candidate);
+    validateRectangles(measurements, candidate, canvas.width, canvas.height);
     pending = candidate; $('lane').value = lane;
     templates[kind] = { w: rect.w, h: rect.h };
     selected = { id: pending.id, part: 'band' };
@@ -182,10 +211,8 @@ function beginDraw(rect) {
   forceFree = false;
 }
 function applyRect(id, part, rect) {
-  const record = recordFor(id); if (!record) return;
-  const old = record[part]; record[part] = rect;
-  try { validateLayout(measurements, pending); }
-  catch (error) { record[part] = old; throw error; }
+  const result = editBox(measurements, pending, id, part, rect, alignment, canvas.width, canvas.height);
+  measurements = result.measurements; pending = result.pending; alignment = result.alignment;
 }
 canvas.addEventListener('pointerdown', event => {
   if (!image || gesture || (event.button !== undefined && event.button !== 0)) return;
@@ -265,6 +292,37 @@ $('reuse-size').addEventListener('click', () => {
   const record = selected ? recordFor(selected.id) : null; if (!record) return;
   const rect = record[selected.part]; templates[$('kind').value] = { w: rect.w, h: rect.h };
   $('lock-size').checked = true; forceFree = false; refresh(false);
+});
+$('apply-size-selected').addEventListener('click', () => {
+  if (!selected) return;
+  const record = recordFor(selected.id); if (!record) return;
+  const w = Number($('selected-w').value), h = Number($('selected-h').value);
+  try { applyRect(selected.id, selected.part, { ...record[selected.part], w, h }); message('Selected box resized from its top-left corner. Quantifications updated.'); }
+  catch (error) { message(error.message); }
+  refresh(false);
+});
+function batchEdit(action, options = {}) {
+  if (!image || pending) { message('Complete or cancel the pending band before editing a group.'); return; }
+  const scope = $('batch-kind').value, old = measurements;
+  try {
+    measurements = arrangeBands(measurements, scope, action, { anchorId: selected?.id, ...options }, canvas.width, canvas.height);
+    for (const kind of groupKinds(scope)) {
+      const first = measurements.find(m => m.kind === kind);
+      if (first && (alignment[kind] !== null || $('align-lock').checked)) alignment[kind] = first.band.y;
+      if (action === 'size' && first) templates[kind] = { w: options.w, h: options.h };
+    }
+    message(action === 'distribute' ? 'Band centers evenly spaced in each selected row. Leftmost and rightmost centers stayed fixed; positions are rounded to image pixels.' : action === 'align' ? 'Band top edges aligned within each selected row. Background positions stayed fixed.' : 'Size applied to the selected band group(s). Positions stayed fixed. Quantifications updated.');
+  } catch (error) { measurements = old; message(error.message); }
+  refresh(false);
+}
+$('align-bands').addEventListener('click', () => batchEdit('align'));
+$('align-y-apply').addEventListener('click', () => batchEdit('align', { y: Number($('align-y').value) }));
+$('distribute-bands').addEventListener('click', () => batchEdit('distribute'));
+$('apply-size-all').addEventListener('click', () => batchEdit('size', { w: Number($('batch-w').value), h: Number($('batch-h').value), backgrounds: $('resize-backgrounds').checked }));
+$('batch-kind').addEventListener('change', () => refresh(false));
+$('align-lock').addEventListener('change', () => {
+  if ($('align-lock').checked) batchEdit('align');
+  else { for (const kind of groupKinds($('batch-kind').value)) alignment[kind] = null; refresh(false); message('Row alignment unlocked. Boxes can move independently.'); }
 });
 $('draw-new-size').addEventListener('click', () => { forceFree = true; $('tool').value = 'draw'; refresh(false); message('Drag a new rectangle to define the next box size.'); });
 $('lock-size').addEventListener('change', () => { forceFree = false; refresh(false); });

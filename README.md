@@ -37,6 +37,18 @@ Rebuild and commit `dist/app.js` after source changes so downloaded copies remai
 7. Change a selected pair's lane label, reuse a selected box's dimensions, or delete a selected band/background pair. Background boxes must not overlap any band; invalid edits are rejected and restored.
 8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane and reference-normalization method, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
 
+## Alignment, spacing and numeric sizes
+
+Under **Align and size band groups**, choose target bands, loading controls, or both types as separate rows. Complete or cancel a pending band/background pair before applying a group operation.
+
+- **Align top edges to selected band** uses the selected pair's band Y position for its row. If that row has no selected band, the leftmost band is the anchor. **Align at this Y** accepts an exact top-edge pixel coordinate. When both types are chosen, numeric alignment preserves the vertical offset between target and control row anchors.
+- **Keep band top edges aligned** aligns the selected group and locks each row. Newly drawn bands snap to the row Y position. Moving or resizing the top edge of a band shifts every band of that type to the new Y; background boxes stay in place. Uncheck it to move boxes independently.
+- **Distribute centers evenly** uses existing left-to-right order, keeps the leftmost and rightmost band centers fixed, and positions intervening centers evenly. At least three bands of the same type are needed. Rounding to whole image pixels can produce one-pixel differences between intervals.
+- **Selected box** provides numeric width/height and **Apply size to selected box**, including for orange background boxes.
+- **Group width/height** and **Apply size to all bands in group** resize completed band boxes in the chosen group. Select **Resize paired background boxes too** to include their backgrounds. Each box's top-left corner stays fixed. Group sizes also become the templates for newly drawn bands of those types.
+
+Bounds and background overlap checks apply to the entire proposed change. If any resulting box would be outside the image or a background would overlap a band, the whole operation is rejected without modifying measurements. Quantifications and plots recalculate after successful changes.
+
 ## Live quantification plot
 
 The plot below the blot updates when a band/background pair is completed and when a box is moved, resized, nudged, relabeled or deleted. During dragging, it previews a valid candidate position; releasing applies the edit, while cancellation restores the saved values. Incomplete bands require a background box before quantification.
@@ -76,6 +88,7 @@ Negative corrected signals are retained. Reference normalization is unavailable 
 - [x] JPEG input and weighted grayscale conversion of RGB input
 - [x] Bundled app that starts without JavaScript module imports
 - [x] Drawn sizes, optional size lock, draggable/resizable boxes, automatic lane advance
+- [x] Numeric individual/group sizes, persistent row alignment and equal horizontal spacing
 - [ ] Zoom and session save/load
 - [ ] Lane intensity profiles and assisted detection after manual workflow validation
 - [x] Live bar plots, normalized views and editable SVG plot export
@@ -93,7 +106,7 @@ Negative corrected signals are retained. Reference normalization is unavailable 
 
 ## Verification
 
-Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation and normalization views. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
+Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation, normalization views, group sizing, alignment locks and equal spacing. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
 
 ## Project structure
 
@@ -102,6 +115,7 @@ Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte
 - `src/analysis.js`: numerical calculations
 - `src/image-input.js`: format detection, native TIFF decoding, grayscale conversion and previews
 - `src/regions.js`: image/display geometry, region editing and lane progression
+- `src/bulk-regions.js`: group alignment, distribution, sizes and transactional validation
 - `src/plot.js`: live SVG charts and plot export
 - `dist/app.js`: committed, ready-to-run browser bundle
 - `test/`: numerical, TIFF fixture and bundle startup checks
