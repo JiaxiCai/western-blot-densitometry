@@ -155,3 +155,55 @@ test('numeric sizes, row alignment, equal spacing and persistent alignment work 
   node('results').children[3].emit('click');
   assert.match(node('selected-info').textContent, /y=80/);
 });
+
+test('automatic backgrounds complete bands and remember manual movement for subsequent bands', () => {
+  const { node, drag } = launch();
+  node('background-placement').value = 'above'; node('background-gap').value = '5'; node('remember-background').checked = true;
+  drag(70, 70, 130, 94);
+  assert.equal(node('results').children.length, 1);
+  assert.equal(node('lane').value, '2');
+  drag(100, 53, 110, 48);
+  assert.match(node('selected-info').textContent, /x=80, y=36/);
+  assert.equal(node('background-placement').value, 'remember');
+  drag(225, 70);
+  assert.equal(node('results').children.length, 2);
+  drag(260, 48);
+  assert.match(node('selected-info').textContent, /x=235, y=36.*60 × 24/);
+  // Moving the band remains independent of its existing background.
+  drag(255, 82, 260, 82);
+  drag(260, 48);
+  assert.match(node('selected-info').textContent, /x=235, y=36/);
+});
+test('failed automatic placement keeps pending band and can be retried below', () => {
+  const { node, drag } = launch();
+  node('background-placement').value = 'above'; node('background-gap').value = '5';
+  drag(70, 5, 130, 29);
+  assert.equal(node('results').children.length, 0);
+  assert.match(node('message').textContent, /Automatic background could not be placed/);
+  assert.match(node('selected-info').textContent, /x=70, y=5/);
+  node('background-placement').value = 'below'; node('place-background').emit('click');
+  assert.equal(node('results').children.length, 1);
+  drag(100, 46);
+  assert.match(node('selected-info').textContent, /x=70, y=34.*60 × 24/);
+});
+test('replace selected background and explicitly reuse offset; remembering can be disabled', () => {
+  const { node, drag } = launch();
+  drag(70, 70, 130, 94); drag(70, 120);
+  node('background-placement').value = 'below'; node('background-gap').value = '5';
+  node('place-background').emit('click');
+  assert.match(node('selected-info').textContent, /x=70, y=99/);
+  drag(100, 111, 110, 116);
+  assert.equal(node('background-placement').value, 'below');
+  node('use-background-offset').emit('click');
+  assert.equal(node('background-placement').value, 'remember');
+  assert.equal(node('remember-background').checked, true);
+  node('draw-new-size').emit('click');
+  drag(225, 70, 275, 100);
+  drag(260, 120);
+  assert.match(node('selected-info').textContent, /x=235, y=110.*50 × 30/);
+  node('background-placement').value = 'manual';
+  drag(400, 70);
+  assert.equal(node('results').children.length, 2);
+  drag(400, 140);
+  assert.equal(node('results').children.length, 3);
+});

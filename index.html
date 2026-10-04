@@ -28,6 +28,14 @@
       </details>
       <p class="region-key"><span class="band-key">Solid blue/purple: band</span><br><span class="background-key">Dashed orange: paired background</span></p>
       <p>Draw around a band, then select nearby blank background. The next lane label advances automatically. Drag inside any box to move it, or drag a selected corner to resize.</p>
+      <h2>Background placement</h2>
+      <label>New background position<select id="background-placement"><option value="manual">Draw manually</option><option value="above">Automatically above band</option><option value="below">Automatically below band</option><option value="remember">Reuse adjusted offset</option></select></label>
+      <label>Gap above / below (pixels)<input id="background-gap" type="number" min="0" step="1" value="5"></label>
+      <label class="checkbox-label"><input id="remember-background" type="checkbox" checked> Remember background adjustments for subsequent bands</label>
+      <p id="background-status" role="status">Choose above/below to create backgrounds automatically.</p>
+      <button id="place-background" disabled>Place background for selected band</button>
+      <button id="use-background-offset" disabled>Use selected background offset for new bands</button>
+      <p>Automatic backgrounds match the band size. Drag either box independently. Remembered positions preserve the gap above/below and any horizontal offset; target and control offsets are saved separately. Gap changes apply to above/below mode.</p>
       <button id="cancel">Cancel pending band</button>
       <button id="undo">Remove last measurement</button>
       <h2>Selected box</h2>

@@ -3,6 +3,7 @@ import { decodeImageFile, toGrayscale, displayRGBA } from './image-input.js';
 import { imagePoint, drawnRect, positionedRect, movedRect, resizedRect, corners, hitRegion, validateLayout, nextLane } from './regions.js';
 import { buildPlot } from './plot.js';
 import { arrangeBands, editBox, groupKinds, validateRectangles } from './bulk-regions.js';
+import { backgroundForBand, offsetFromPair, describeOffset } from './backgrounds.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('blot'), ctx = canvas.getContext('2d');
@@ -11,6 +12,7 @@ let imageMetadata = { maxValue: 255, bitDepth: 8, format: 'PNG', pages: 1, hasCo
 let selected = null, gesture = null, nextId = 1, forceFree = false;
 let templates = { target: null, control: null };
 let alignment = { target: null, control: null };
+let backgroundOffsets = { target: null, control: null }, lastBackgroundOffset = null;
 const colors = { target: '#007caa', control: '#a251c8', background: '#df7a00' };
 function message(text) { $('message').textContent = text; }
 function loadStatus(text, state = 'info') {
@@ -30,6 +32,18 @@ function regions() {
 function nextSize() {
   if (forceFree || !$('lock-size').checked) return null;
   return pending ? { w: pending.band.w, h: pending.band.h } : templates[$('kind').value];
+}
+function automaticBackground() { return ['above', 'below', 'remember'].includes($('background-placement').value); }
+function backgroundConfig(kind) {
+  const mode = $('background-placement').value, gap = Number($('background-gap').value);
+  if (mode === 'above' || mode === 'below') return { side: mode, gap, dx: 0 };
+  return backgroundOffsets[kind] || lastBackgroundOffset || { side: 'below', gap, dx: 0 };
+}
+function rememberBackground(record, adjusted = false) {
+  if (!$('remember-background').checked || !record.background) return;
+  const offset = offsetFromPair(record.band, record.background);
+  backgroundOffsets[record.kind] = offset; lastBackgroundOffset = offset;
+  if (adjusted && automaticBackground()) $('background-placement').value = 'remember';
 }
 function updateEditor() {
   const size = nextSize();
@@ -52,6 +66,10 @@ function updateEditor() {
   for (const id of ['align-bands', 'align-y-apply', 'distribute-bands', 'apply-size-all']) $(id).disabled = !image || !!pending;
   if (record?.band) $('align-y').value = record.band.y;
   $('alignment-status').textContent = kinds.map(kind => alignment[kind] === null ? `${kind}: alignment unlocked` : `${kind}: locked to Y=${alignment[kind]}`).join('; ');
+  $('place-background').disabled = !record;
+  $('use-background-offset').disabled = !record?.background;
+  const nextKind = pending?.kind || $('kind').value || 'target';
+  $('background-status').textContent = automaticBackground() ? `Next ${nextKind} background: ${describeOffset(backgroundConfig(nextKind))}. Same size as its band.` : 'Backgrounds are placed manually. Choose above/below to create them automatically.';
 }
 function paint() {
   if (!image) return;
@@ -154,6 +172,7 @@ function installImage(decoded, name) {
   image = source; pixels = decoded.pixels; imageMetadata = decoded; filename = name; measurements = []; pending = null;
   selected = null; gesture = null; nextId = 1; forceFree = false; templates = { target: null, control: null };
   alignment = { target: null, control: null };
+  backgroundOffsets = { target: null, control: null }; lastBackgroundOffset = null;
   $('lane').value = '1'; $('tool').value = 'draw';
   canvas.width = w; canvas.height = h; canvas.style.display = 'block'; $('empty').hidden = true;
   $('box-w').value = Math.min(60, w); $('box-h').value = Math.min(24, h);
@@ -200,19 +219,28 @@ function beginDraw(rect) {
     templates[kind] = { w: rect.w, h: rect.h };
     selected = { id: pending.id, part: 'band' };
     message(`Band selected for lane ${lane}. Now select a blank area for its orange background box.`);
+    if (automaticBackground()) {
+      try { completePending(backgroundForBand(rect, backgroundConfig(kind)), true); }
+      catch (error) { message(`Automatic background could not be placed: ${error.message} The band is kept. Draw a manual background, or change its position and use Place background for selected band.`); }
+    }
   } else {
-    const candidate = { ...pending, background: rect };
-    validateLayout([...measurements, candidate]);
-    measurements.push(candidate); pending = null;
-    selected = { id: candidate.id, part: 'background' };
-    $('lane').value = nextLane(candidate.lane, candidate.kind, measurements);
-    message(`Lane ${candidate.lane} saved. Continue with lane ${$('lane').value}. Drag any box to move it; select a corner to resize.`);
+    completePending(rect);
   }
   forceFree = false;
+}
+function completePending(background, automatic = false) {
+  const candidate = { ...pending, background };
+  validateRectangles([...measurements, candidate], null, canvas.width, canvas.height);
+  measurements.push(candidate); pending = null;
+  rememberBackground(candidate);
+  selected = { id: candidate.id, part: automatic ? 'band' : 'background' };
+  $('lane').value = nextLane(candidate.lane, candidate.kind, measurements);
+  message(`Lane ${candidate.lane} saved${automatic ? ' with automatic background' : ''}. Continue with lane ${$('lane').value}. Both boxes can still be moved independently.`);
 }
 function applyRect(id, part, rect) {
   const result = editBox(measurements, pending, id, part, rect, alignment, canvas.width, canvas.height);
   measurements = result.measurements; pending = result.pending; alignment = result.alignment;
+  if (part === 'background') rememberBackground(recordFor(id), true);
 }
 canvas.addEventListener('pointerdown', event => {
   if (!image || gesture || (event.button !== undefined && event.button !== 0)) return;
@@ -325,6 +353,29 @@ $('align-lock').addEventListener('change', () => {
   else { for (const kind of groupKinds($('batch-kind').value)) alignment[kind] = null; refresh(false); message('Row alignment unlocked. Boxes can move independently.'); }
 });
 $('draw-new-size').addEventListener('click', () => { forceFree = true; $('tool').value = 'draw'; refresh(false); message('Drag a new rectangle to define the next box size.'); });
+for (const id of ['background-placement', 'background-gap', 'remember-background']) $(id).addEventListener('change', () => refresh(false));
+$('place-background').addEventListener('click', () => {
+  const record = selected ? recordFor(selected.id) : null; if (!record) return;
+  if (!automaticBackground()) { message('Choose above, below, or reuse adjusted offset first.'); return; }
+  try {
+    const background = backgroundForBand(record.band, backgroundConfig(record.kind));
+    if (pending?.id === record.id) completePending(background, true);
+    else {
+      const next = measurements.map(m => m.id === record.id ? { ...m, background } : m);
+      validateRectangles(next, pending, canvas.width, canvas.height);
+      measurements = next; rememberBackground(recordFor(record.id));
+      selected = { id: record.id, part: 'background' };
+      message('Same-size background placed. Both boxes can still be moved independently.');
+    }
+  } catch (error) { message(`Background could not be placed: ${error.message}`); }
+  refresh(false);
+});
+$('use-background-offset').addEventListener('click', () => {
+  const record = selected ? recordFor(selected.id) : null; if (!record?.background) return;
+  $('remember-background').checked = true; rememberBackground(record);
+  $('background-placement').value = 'remember'; refresh(false);
+  message('Selected background offset will be reused for new bands. Existing boxes stay in place.');
+});
 $('lock-size').addEventListener('change', () => { forceFree = false; refresh(false); });
 $('tool').addEventListener('change', () => { gesture = null; refresh(false); });
 $('kind').addEventListener('change', () => {

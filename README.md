@@ -31,11 +31,19 @@ Rebuild and commit `dist/app.js` after source changes so downloaded copies remai
 1. Open a TIFF (.tif/.tiff), JPEG (.jpg/.jpeg), or 8-bit PNG, or load the synthetic example. The status beside the input reports loading errors, bit depth, and conversion notes.
 2. Choose dark or bright signal polarity, the next lane label, and band type. Color images are automatically converted to weighted grayscale for both display and measurement.
 3. Click and drag around the first band to define its box dimensions. Blue boxes are target bands; purple boxes are loading controls.
-4. Select nearby blank background for that band (dashed orange). With **Keep subsequent boxes the same size** checked, click or drag to position a box of the remembered size. After each completed pair, the lane label advances automatically so you can continue adding bands.
+4. Under **Background placement**, choose automatic above/below and a pixel gap to generate a same-size orange background as soon as you draw a band, or leave **Draw manually** selected and select nearby blank background. With **Keep subsequent boxes the same size** checked, click or drag to position a box of the remembered size. After each completed pair, the lane label advances automatically so you can continue adding bands.
 5. Uncheck the size lock to draw each rectangle independently. **Draw a new box size** overrides the lock for the next rectangle. Target and control band sizes are remembered separately. Exact pixel dimensions remain available under the optional dimensions panel.
 6. Click a box to select it; drag inside it to move, or drag one of its corner handles to resize. Arrow keys nudge a selected box by one image pixel, or ten with Shift. **Move or resize existing boxes** prevents drawing new boxes while editing. A results row also selects its band.
 7. Change a selected pair's lane label, reuse a selected box's dimensions, or delete a selected band/background pair. Background boxes must not overlap any band; invalid edits are rejected and restored.
 8. Switch to loading controls; the next label starts at the first target missing a control. Use the same lane labels for target/control pairs. Choose a reference lane and reference-normalization method, then export full-precision CSV measurements and an annotated SVG with editable Arial text.
+
+## Automatic backgrounds
+
+Choose **Automatically above band** or **Automatically below band** and a nonnegative whole-pixel gap. Every new band gets a matching-size background, and its quantification appears immediately. Backgrounds must be inside the image and cannot overlap any band. If placement fails, the blue/purple pending band remains: draw a background manually, or change the position setting and press **Place background for selected band**. This button also replaces the selected completed band's background after validating the proposed layout.
+
+With **Remember background adjustments for subsequent bands** checked, moving, nudging, or resizing an orange background stores its relative position and switches automatic placement to **Reuse adjusted offset**. Above/below offsets preserve the edge-to-edge gap and horizontal offset when the next band has a different height. Sideways positions preserve X/Y offsets. Automatically generated backgrounds always match the new band's size. Target and control offsets are stored separately, with the last offset used as a starting point for a new type. **Use selected background offset for new bands** explicitly activates reuse from an existing pair.
+
+Both boxes can still be moved and resized independently. Existing backgrounds stay in place when bands are moved or group alignment/spacing is applied. Switch back to above/below to reset the position to directly above/below at the entered gap, uncheck remembering to stop learning adjustments, or choose manual placement. Loading another image clears remembered offsets. Check every automatic background for suitable blank signal.
 
 ## Alignment, spacing and numeric sizes
 
@@ -106,7 +114,7 @@ Negative corrected signals are retained. Reference normalization is unavailable 
 
 ## Verification
 
-Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation, normalization views, group sizing, alignment locks and equal spacing. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
+Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte orders, LZW, Deflate, WhiteIsZero, and multi-page input. Numerical tests verify full-depth measurement and preview independence. Simulated-DOM tests run the committed bundle and verify startup, drawing the first box, repeated locked/unlocked boxes, lane advance, dragging, resizing, recalculation, overlap rejection, keyboard nudging, deletion, live plot previews, preview cancellation, normalization views, group sizing, alignment locks, equal spacing, automatic background placement, remembered offsets and invalid-placement recovery. Live browser/file-picker verification is still pending; the development browser cannot reach the local server in this environment.
 
 ## Project structure
 
@@ -115,6 +123,7 @@ Known-value TIFF fixtures generated with Pillow cover 8/16-bit pixels, both byte
 - `src/analysis.js`: numerical calculations
 - `src/image-input.js`: format detection, native TIFF decoding, grayscale conversion and previews
 - `src/regions.js`: image/display geometry, region editing and lane progression
+- `src/backgrounds.js`: same-size background generation and relative offset learning
 - `src/bulk-regions.js`: group alignment, distribution, sizes and transactional validation
 - `src/plot.js`: live SVG charts and plot export
 - `dist/app.js`: committed, ready-to-run browser bundle
